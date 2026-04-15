@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/Users/youxuezhe/vsproj/follower/.test-venv/bin/follower hook-prompt:*)",
+      "Bash(/Users/youxuezhe/vsproj/follower/.test-venv/bin/follower hook-failure:*)",
+      "Bash(/Users/youxuezhe/vsproj/follower/.test-venv/bin/follower hook-stop:*)",
+      "Bash(uv pip:*)",
+      "Bash(.test-venv/bin/follower status:*)",
+      "Bash(kill -9 29725)",
+      "Bash(git config:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/youxuezhe/StudioProjects/mobile_claw/.follower/seeds"
+    ]
+  }
+}
