@@ -1,0 +1,84 @@
+# ==================== OS Generated ====================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==================== Editor/IDE ====================
+*.iml
+*.swp
+*.swo
+*.tmp
+*~.nib
+.idea/
+.vscode/
+*.sublime-*
+.fleet/
+
+# ==================== Kotlin/Java ====================
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.log
+*.ctxt
+.mtj.tmp/
+hs_err_pid*
+replay_pid*
+
+# ==================== Gradle ====================
+.gradle/
+build/
+out/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+
+# ==================== Android ====================
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+captures/
+*.keystore
+*.jks
+upload-keystore.json
+play-account.json
+
+# Android Studio Navigation editor temp files
+.navigation/
+
+# External native build folder generated in Android Studio 2.2 and later
+.externalNativeBuild
+.cxx/
+
+# NDK
+obj/
+
+# ==================== Secrets/Env ====================
+.env
+.env.*
+secrets.properties
+*.pem
+*.p12
+
+# ==================== Testing ====================
+.coverage
+.test/
+htmlcov/
+.tox/
+.nox/
+
+# ==================== Misc ====================
+*.bak
+*.orig
+*.pidb
+*.pyc
+*.pyo
+
+# Screenshots (optional - remove if you want to track)
+screen.png

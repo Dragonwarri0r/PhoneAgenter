@@ -1,0 +1,19 @@
+project_id: mobile-claw
+embedding:
+  backend: sentence-transformers
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  vector_dim: 64
+prompt_hook:
+  enabled: true
+  top_k: 6
+  budget_chars: 4000
+  min_score: 0.02
+failure_hook:
+  enabled: true
+  top_k: 5
+  budget_chars: 3000
+  min_score: 0.03
+stop_hook:
+  enabled: true
+  writeback_enabled: true
+trace_results: true
