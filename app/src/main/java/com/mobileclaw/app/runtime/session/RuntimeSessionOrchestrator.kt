@@ -4,6 +4,10 @@ import com.mobileclaw.app.R
 import com.mobileclaw.app.runtime.action.StructuredActionNormalizer
 import com.mobileclaw.app.runtime.capability.CapabilityRouter
 import com.mobileclaw.app.runtime.capability.CallerTrustState
+import com.mobileclaw.app.runtime.contribution.ContributionLifecyclePoint
+import com.mobileclaw.app.runtime.contribution.ContributionOutcomeRecord
+import com.mobileclaw.app.runtime.contribution.ContributionOutcomeState
+import com.mobileclaw.app.runtime.contribution.RuntimeContributionRegistry
 import com.mobileclaw.app.runtime.ingress.ExternalInvocationRecord
 import com.mobileclaw.app.runtime.memory.MemoryWritebackService
 import com.mobileclaw.app.runtime.policy.ActionScope
@@ -87,12 +91,23 @@ class RuntimeSessionOrchestrator @Inject constructor(
         emit(RuntimeSessionEvent.StatusSummaryUpdated(session.summary))
         var terminalEmitted = false
         var activeApprovalRequest: ApprovalRequest? = null
+        val contributionOutcomes = mutableListOf<ContributionOutcomeRecord>()
+        val contextContributions = mutableListOf<com.mobileclaw.app.runtime.contribution.ContextContribution>()
         try {
             val contextPayload = contextLoader.load(request)
+            contributionOutcomes += contextPayload.contributionOutcomes
+            contextContributions += contextPayload.contextContributions
             emit(
                 RuntimeSessionEvent.SystemSourcesPrepared(
                     descriptors = contextPayload.systemSourceDescriptors,
                     contributions = contextPayload.systemSourceContributions,
+                ),
+            )
+            emit(
+                RuntimeSessionEvent.ContributionsUpdated(
+                    outcomes = contributionOutcomes.toList(),
+                    contextContributions = contextContributions.toList(),
+                    knowledgeContribution = contextPayload.knowledgeContribution,
                 ),
             )
             val contextSession = registry.advanceStage(
@@ -274,6 +289,30 @@ class RuntimeSessionOrchestrator @Inject constructor(
             policyRepository.saveDecision(decision)
             emit(RuntimeSessionEvent.PolicyResolved(decision))
             emit(RuntimeSessionEvent.AuditRecorded(auditRepository.recordPolicyDecided(decision)))
+            contributionOutcomes.removeAll { it.contributionId == RuntimeContributionRegistry.POLICY_EXECUTION_GATE_ID }
+            contributionOutcomes += ContributionOutcomeRecord(
+                contributionId = RuntimeContributionRegistry.POLICY_EXECUTION_GATE_ID,
+                requestId = request.requestId,
+                lifecyclePoint = ContributionLifecyclePoint.APPROVAL,
+                outcomeState = when (decision.decision) {
+                    PolicyDecisionType.DENY -> ContributionOutcomeState.BLOCKED
+                    PolicyDecisionType.PREVIEW_FIRST,
+                    PolicyDecisionType.REQUIRE_CONFIRMATION,
+                    -> ContributionOutcomeState.DEGRADED
+                    PolicyDecisionType.AUTO_EXECUTE -> ContributionOutcomeState.APPLIED
+                },
+                summary = decision.rationale,
+                details = appStrings.actionScopeLabel(ActionScope.fromScopeId(decision.effectiveScopeId)),
+                policyReason = decision.rationale,
+                provenanceSummary = appStrings.get(R.string.runtime_contribution_policy_title),
+            )
+            emit(
+                RuntimeSessionEvent.ContributionsUpdated(
+                    outcomes = contributionOutcomes.toList(),
+                    contextContributions = contextContributions.toList(),
+                    knowledgeContribution = contextPayload.knowledgeContribution,
+                ),
+            )
 
             val gateSession = registry.advanceStage(
                 sessionId = session.sessionId,

@@ -1,10 +1,10 @@
 package com.mobileclaw.app.ui.agentworkspace.components
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -47,16 +47,28 @@ fun ContextInspectorSheet(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = stringResource(R.string.workspace_context_inspector),
+                    text = inspector.title.ifBlank { stringResource(R.string.workspace_memory_title) },
                     style = MaterialTheme.typography.titleLarge,
                 )
-                Text(
-                    text = inspector.personaSummary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(onClick = onCyclePersonaVerbosity) {
-                    Text(stringResource(R.string.workspace_cycle_persona_verbosity))
+                inspector.headline.takeIf { it.isNotBlank() }?.let { headline ->
+                    Text(
+                        text = headline,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                inspector.supportingText.takeIf { it.isNotBlank() }?.let { supportingText ->
+                    Text(
+                        text = supportingText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (inspector.personaSummary.isNotBlank()) {
+                    Text(
+                        text = inspector.personaSummary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             if (inspector.hiddenPrivateCount > 0) {
@@ -79,117 +91,126 @@ fun ContextInspectorSheet(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = inspector.retrievalSummary,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (inspector.extensionSummary.isNotBlank()) {
+            if (inspector.activeMemoryItems.isEmpty()) {
                 Text(
-                    text = inspector.extensionSummary,
-                    style = MaterialTheme.typography.bodySmall,
+                    text = inspector.emptyState,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                inspector.activeMemoryItems.forEach { item ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        ),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    inspector.activeMemoryItems.forEach { item ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            ),
                         ) {
-                            Text(
-                                text = item.title,
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                text = item.detail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = item.syncDetail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = item.mergeDetail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = item.exportDetail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = item.extensionDetail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            AssistChip(
-                                onClick = {},
-                                enabled = false,
-                                label = { Text(item.badge) },
-                            )
-                            Row(
-                                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                TextButton(
-                                    onClick = { onTogglePin(item.memoryId) },
-                                ) {
+                                Text(
+                                    text = item.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    text = item.content,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                if (item.summary.isNotBlank() && item.summary != item.content) {
                                     Text(
-                                        if (item.isPinned) {
-                                            stringResource(R.string.common_unpin)
-                                        } else {
-                                            stringResource(R.string.common_pin)
-                                        },
+                                        text = item.summary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                if (item.canPromote) {
-                                    TextButton(
-                                        onClick = { onPromote(item.memoryId) },
+                                if (item.badges.isNotEmpty()) {
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     ) {
-                                        Text(stringResource(R.string.common_promote))
+                                        item.badges.forEach { badge ->
+                                            AssistChip(
+                                                onClick = {},
+                                                enabled = false,
+                                                label = { Text(badge) },
+                                            )
+                                        }
                                     }
                                 }
-                                if (item.canDemote) {
-                                    TextButton(
-                                        onClick = { onDemote(item.memoryId) },
-                                    ) {
-                                        Text(stringResource(R.string.common_demote))
-                                    }
-                                }
-                                if (item.canExpire) {
-                                    TextButton(
-                                        onClick = { onExpire(item.memoryId) },
-                                    ) {
-                                        Text(stringResource(R.string.common_expire))
-                                    }
-                                }
-                                TextButton(
-                                    onClick = { onPreviewExport(item.memoryId) },
-                                ) {
+                                item.policyLine.takeIf { it.isNotBlank() }?.let { policyLine ->
                                     Text(
-                                        if (item.canExport) {
-                                            stringResource(R.string.portability_export_action)
-                                        } else {
-                                            stringResource(R.string.portability_export_blocked_action)
-                                        },
+                                        text = policyLine,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                }
+                                item.provenanceLine.takeIf { it.isNotBlank() }?.let { provenanceLine ->
+                                    Text(
+                                        text = provenanceLine,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    TextButton(
+                                        onClick = { onTogglePin(item.memoryId) },
+                                    ) {
+                                        Text(
+                                            if (item.isPinned) {
+                                                stringResource(R.string.common_unpin)
+                                            } else {
+                                                stringResource(R.string.common_pin)
+                                            },
+                                        )
+                                    }
+                                    if (item.canPromote) {
+                                        TextButton(
+                                            onClick = { onPromote(item.memoryId) },
+                                        ) {
+                                            Text(stringResource(R.string.common_promote))
+                                        }
+                                    }
+                                    if (item.canDemote) {
+                                        TextButton(
+                                            onClick = { onDemote(item.memoryId) },
+                                        ) {
+                                            Text(stringResource(R.string.common_demote))
+                                        }
+                                    }
+                                    if (item.canExpire) {
+                                        TextButton(
+                                            onClick = { onExpire(item.memoryId) },
+                                        ) {
+                                            Text(stringResource(R.string.common_expire))
+                                        }
+                                    }
+                                    TextButton(
+                                        onClick = { onPreviewExport(item.memoryId) },
+                                    ) {
+                                        Text(
+                                            if (item.canExport) {
+                                                stringResource(R.string.portability_export_action)
+                                            } else {
+                                                stringResource(R.string.portability_export_blocked_action)
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
+            }
+            TextButton(onClick = onCyclePersonaVerbosity) {
+                Text(stringResource(R.string.workspace_cycle_persona_verbosity))
             }
         }
     }

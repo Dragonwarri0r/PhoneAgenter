@@ -4,6 +4,10 @@ import com.mobileclaw.app.R
 import com.mobileclaw.app.runtime.strings.AppStrings
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 
 @Singleton
 class RuntimeExtensionRegistry @Inject constructor(
@@ -16,10 +20,16 @@ class RuntimeExtensionRegistry @Inject constructor(
         "tool_contract.v1",
         "provider.local",
         "system_source.contacts",
+        "system_source.calendar",
         "portability.v1",
     )
+    private val enablementOverrides = MutableStateFlow<Map<String, ExtensionEnablementState>>(emptyMap())
 
     fun registrations(): List<RuntimeExtensionRegistration> = DefaultRuntimeExtensionRegistrations.seeded()
+
+    fun observeDiscoverySummaries(): Flow<List<ExtensionContributionSummary>> {
+        return enablementOverrides.asStateFlow().map { discoverySummaries() }
+    }
 
     fun discoverySummaries(): List<ExtensionContributionSummary> {
         return registrations().map { registration ->
@@ -77,11 +87,33 @@ class RuntimeExtensionRegistry @Inject constructor(
         )
     }
 
+    fun currentEnablementState(extensionId: String): ExtensionEnablementState {
+        val registration = registrations().firstOrNull { it.extensionId == extensionId }
+            ?: return ExtensionEnablementState.INCOMPATIBLE
+        val compatibility = evaluateCompatibility(registration)
+        return resolveEnablementState(registration, compatibility)
+    }
+
+    fun toggleEnablementState(extensionId: String): ExtensionEnablementState? {
+        val registration = registrations().firstOrNull { it.extensionId == extensionId } ?: return null
+        val compatibility = evaluateCompatibility(registration)
+        if (!compatibility.isCompatible) return ExtensionEnablementState.INCOMPATIBLE
+        val current = resolveEnablementState(registration, compatibility)
+        val restoredState = registration.defaultEnablementState
+        val next = if (current == ExtensionEnablementState.DISABLED) {
+            restoredState
+        } else {
+            ExtensionEnablementState.DISABLED
+        }
+        enablementOverrides.value = enablementOverrides.value + (extensionId to next)
+        return next
+    }
+
     private fun resolveEnablementState(
         registration: RuntimeExtensionRegistration,
         compatibility: ExtensionCompatibilityReport,
     ): ExtensionEnablementState {
         if (!compatibility.isCompatible) return ExtensionEnablementState.INCOMPATIBLE
-        return registration.defaultEnablementState
+        return enablementOverrides.value[registration.extensionId] ?: registration.defaultEnablementState
     }
 }

@@ -4,6 +4,14 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import com.mobileclaw.app.runtime.knowledge.KnowledgeAvailabilityEntity
+import com.mobileclaw.app.runtime.knowledge.KnowledgeAvailabilityHealth
+import com.mobileclaw.app.runtime.knowledge.KnowledgeChunkEntity
+import com.mobileclaw.app.runtime.knowledge.KnowledgeDao
+import com.mobileclaw.app.runtime.knowledge.KnowledgeAssetEntity
+import com.mobileclaw.app.runtime.knowledge.KnowledgeIngestionRecordEntity
+import com.mobileclaw.app.runtime.knowledge.KnowledgeIngestionState
+import com.mobileclaw.app.runtime.knowledge.KnowledgeSourceType
 import com.mobileclaw.app.runtime.policy.ApprovalDao
 import com.mobileclaw.app.runtime.policy.ApprovalOutcome
 import com.mobileclaw.app.runtime.policy.ApprovalRequest
@@ -23,6 +31,17 @@ import com.mobileclaw.app.runtime.policy.PolicyRuleSource
 import com.mobileclaw.app.runtime.policy.RiskAssessment
 import com.mobileclaw.app.runtime.policy.RiskLevel
 import com.mobileclaw.app.runtime.policy.ApprovalOutcomeType
+import com.mobileclaw.app.runtime.workflow.WorkflowAvailabilityState
+import com.mobileclaw.app.runtime.workflow.WorkflowCheckpointEntity
+import com.mobileclaw.app.runtime.workflow.WorkflowCheckpointState
+import com.mobileclaw.app.runtime.workflow.WorkflowDao
+import com.mobileclaw.app.runtime.workflow.WorkflowDefinitionEntity
+import com.mobileclaw.app.runtime.workflow.WorkflowRunEntity
+import com.mobileclaw.app.runtime.workflow.WorkflowRunState
+import com.mobileclaw.app.runtime.workflow.WorkflowStepEntity
+import com.mobileclaw.app.runtime.workflow.WorkflowStepType
+import com.mobileclaw.app.runtime.workflow.WorkflowTriggerEntity
+import com.mobileclaw.app.runtime.workflow.WorkflowTriggerType
 
 // Migration rule:
 // Any Room entity/schema change in this database must also bump the database version.
@@ -37,8 +56,17 @@ import com.mobileclaw.app.runtime.policy.ApprovalOutcomeType
         AuditEvent::class,
         CallerGovernanceRecord::class,
         ScopeGrantRecord::class,
+        KnowledgeAssetEntity::class,
+        KnowledgeIngestionRecordEntity::class,
+        KnowledgeAvailabilityEntity::class,
+        KnowledgeChunkEntity::class,
+        WorkflowDefinitionEntity::class,
+        WorkflowStepEntity::class,
+        WorkflowTriggerEntity::class,
+        WorkflowRunEntity::class,
+        WorkflowCheckpointEntity::class,
     ],
-    version = 5,
+    version = 7,
     exportSchema = false,
 )
 @TypeConverters(MemoryConverters::class)
@@ -48,6 +76,8 @@ abstract class MemoryDatabase : RoomDatabase() {
     abstract fun approvalDao(): ApprovalDao
     abstract fun auditDao(): AuditDao
     abstract fun governanceDao(): GovernanceDao
+    abstract fun knowledgeDao(): KnowledgeDao
+    abstract fun workflowDao(): WorkflowDao
 }
 
 class MemoryConverters {
@@ -138,6 +168,57 @@ class MemoryConverters {
 
     @TypeConverter
     fun toGovernanceGrantState(value: String): GovernanceGrantState = GovernanceGrantState.valueOf(value)
+
+    @TypeConverter
+    fun fromKnowledgeSourceType(value: KnowledgeSourceType): String = value.name
+
+    @TypeConverter
+    fun toKnowledgeSourceType(value: String): KnowledgeSourceType = KnowledgeSourceType.valueOf(value)
+
+    @TypeConverter
+    fun fromKnowledgeIngestionState(value: KnowledgeIngestionState): String = value.name
+
+    @TypeConverter
+    fun toKnowledgeIngestionState(value: String): KnowledgeIngestionState = KnowledgeIngestionState.valueOf(value)
+
+    @TypeConverter
+    fun fromKnowledgeAvailabilityHealth(value: KnowledgeAvailabilityHealth): String = value.name
+
+    @TypeConverter
+    fun toKnowledgeAvailabilityHealth(value: String): KnowledgeAvailabilityHealth =
+        KnowledgeAvailabilityHealth.valueOf(value)
+
+    @TypeConverter
+    fun fromWorkflowAvailabilityState(value: WorkflowAvailabilityState): String = value.name
+
+    @TypeConverter
+    fun toWorkflowAvailabilityState(value: String): WorkflowAvailabilityState =
+        WorkflowAvailabilityState.valueOf(value)
+
+    @TypeConverter
+    fun fromWorkflowStepType(value: WorkflowStepType): String = value.name
+
+    @TypeConverter
+    fun toWorkflowStepType(value: String): WorkflowStepType = WorkflowStepType.valueOf(value)
+
+    @TypeConverter
+    fun fromWorkflowTriggerType(value: WorkflowTriggerType): String = value.name
+
+    @TypeConverter
+    fun toWorkflowTriggerType(value: String): WorkflowTriggerType = WorkflowTriggerType.valueOf(value)
+
+    @TypeConverter
+    fun fromWorkflowRunState(value: WorkflowRunState): String = value.name
+
+    @TypeConverter
+    fun toWorkflowRunState(value: String): WorkflowRunState = WorkflowRunState.valueOf(value)
+
+    @TypeConverter
+    fun fromWorkflowCheckpointState(value: WorkflowCheckpointState): String = value.name
+
+    @TypeConverter
+    fun toWorkflowCheckpointState(value: String): WorkflowCheckpointState =
+        WorkflowCheckpointState.valueOf(value)
 
     @TypeConverter
     fun fromStringList(values: List<String>): String = values.joinToString(separator = LIST_SEPARATOR)

@@ -276,6 +276,64 @@ fun ContextWindowCard(
                     }
                 }
             }
+            if (runtimeStatus.contributionSummaryLines.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.runtime_control_section_contributions),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                runtimeStatus.contributionSummaryLines.forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                runtimeStatus.contributionDetailLines.take(2).forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                runtimeStatus.contributionDetailLines.drop(2).take(2).forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (runtimeStatus.knowledgeSupportLines.isNotEmpty() || runtimeStatus.knowledgeCitationLines.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.runtime_control_section_knowledge),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                runtimeStatus.knowledgeSupportLines.forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                runtimeStatus.knowledgeCitationLines.forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                runtimeStatus.knowledgeLimitationSummary
+                    .takeIf { it.isNotBlank() }
+                    ?.let { limitation ->
+                        Text(
+                            text = limitation,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+            }
             if (runtimeStatus.extensionStatusLines.isNotEmpty()) {
                 Text(
                     text = stringResource(R.string.workspace_extension_discovery),

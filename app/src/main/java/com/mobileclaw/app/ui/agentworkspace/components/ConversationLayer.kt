@@ -27,6 +27,7 @@ import com.mobileclaw.app.ui.agentworkspace.model.ChatTurnUiModel
 fun ConversationLayer(
     turns: List<ChatTurnUiModel>,
     contentPadding: PaddingValues = PaddingValues(bottom = 4.dp),
+    emptyContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -43,12 +44,16 @@ fun ConversationLayer(
             modifier = modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = stringResource(R.string.workspace_start_first_exchange),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
+            if (emptyContent != null) {
+                emptyContent()
+            } else {
+                Text(
+                    text = stringResource(R.string.workspace_start_first_exchange),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
         }
     } else {
         LazyColumn(
@@ -57,7 +62,7 @@ fun ConversationLayer(
                 .semantics { contentDescription = transcriptDescription },
             state = listState,
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(turns, key = { it.turnId }) { turn ->
                 val alignment = if (turn.role == ChatRoleUi.USER) {
@@ -66,7 +71,9 @@ fun ConversationLayer(
                     Alignment.CenterStart
                 }
                 Box(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp),
                     contentAlignment = alignment,
                 ) {
                     MessageBubble(

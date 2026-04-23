@@ -13,6 +13,7 @@ litertlm = "0.10.0"
 tflite = "16.4.0"
 appfunctions = "1.0.0-alpha08"
 ksp = "2.2.0-2.0.2"
+richtext = "1.0.0-alpha02"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -41,6 +42,8 @@ androidx-compose-material-icons-extended = { module = "androidx.compose.material
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-android-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version = "1.2.0" }
+richtext-commonmark = { group = "com.halilibo.compose-richtext", name = "richtext-commonmark", version.ref = "richtext" }
+richtext-ui-material3 = { group = "com.halilibo.compose-richtext", name = "richtext-ui-material3", version.ref = "richtext" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

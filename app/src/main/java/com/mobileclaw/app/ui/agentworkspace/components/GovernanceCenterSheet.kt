@@ -109,6 +109,51 @@ fun GovernanceCenterSheet(
                 }
             }
             Text(
+                text = stringResource(R.string.governance_contributors_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (governance.contributors.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.governance_no_contributors),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            governance.contributors.forEach { contributor ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = contributor.title,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = contributor.availabilityLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = contributor.summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    contributor.governanceLines.forEach { line ->
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    contributor.limitationSummary
+                        .takeIf { it.isNotBlank() }
+                        ?.let { limitation ->
+                            Text(
+                                text = limitation,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                }
+            }
+            Text(
                 text = stringResource(R.string.governance_recent_activity),
                 style = MaterialTheme.typography.titleMedium,
             )

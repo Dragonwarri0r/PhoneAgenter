@@ -6,6 +6,7 @@ import android.provider.CalendarContract
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
 import com.mobileclaw.app.R
+import com.mobileclaw.app.runtime.contribution.RuntimeContributionRegistry
 import com.mobileclaw.app.runtime.intent.RuntimeIntentHeuristics
 import com.mobileclaw.app.runtime.memory.MemoryExposurePolicy
 import com.mobileclaw.app.runtime.memory.MemoryItem
@@ -26,6 +27,7 @@ class SystemSourceIngestionService @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val sourceRepository: SystemSourceRepository,
     private val memoryRepository: ScopedMemoryRepository,
+    private val contributionRegistry: RuntimeContributionRegistry,
     private val appStrings: AppStrings,
 ) {
     suspend fun ingestForRequest(request: RuntimeRequest): SystemSourceIngestionBundle {
@@ -36,7 +38,13 @@ class SystemSourceIngestionService @Inject constructor(
         val inferred = RuntimeIntentHeuristics.infer(input)
 
         descriptors.firstOrNull { it.sourceId == SystemSourceId.CONTACTS }?.let { descriptor ->
-            if (descriptor.isGranted && shouldCheckContacts(input)) {
+            if (
+                contributionRegistry.isEnabled(
+                    contributionRegistry.systemSourceContributionId(SystemSourceId.CONTACTS),
+                ) &&
+                descriptor.isGranted &&
+                shouldCheckContacts(input)
+            ) {
                 val contactItems = ingestContacts(request)
                 if (contactItems.isNotEmpty()) {
                     results += SystemSourceIngestionResult(
@@ -56,7 +64,13 @@ class SystemSourceIngestionService @Inject constructor(
         }
 
         descriptors.firstOrNull { it.sourceId == SystemSourceId.CALENDAR }?.let { descriptor ->
-            if (descriptor.isGranted && shouldCheckCalendar(input, inferred.capabilityId)) {
+            if (
+                contributionRegistry.isEnabled(
+                    contributionRegistry.systemSourceContributionId(SystemSourceId.CALENDAR),
+                ) &&
+                descriptor.isGranted &&
+                shouldCheckCalendar(input, inferred.capabilityId)
+            ) {
                 val calendarItems = ingestCalendar(request)
                 if (calendarItems.isNotEmpty()) {
                     results += SystemSourceIngestionResult(

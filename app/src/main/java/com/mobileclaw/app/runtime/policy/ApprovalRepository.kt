@@ -142,6 +142,38 @@ class ApprovalRepository @Inject constructor(
         return approvalDao.getLatestRequestForSession(sessionId)
     }
 
+    suspend fun createWorkflowApprovalRequest(
+        sessionId: String,
+        toolId: String,
+        toolDisplayName: String,
+        sideEffectLabel: String,
+        scopeLines: List<String>,
+        previewLines: List<String>,
+        title: String,
+        summary: String,
+        previewPayload: String,
+    ): ApprovalRequest {
+        val approvalRequest = ApprovalRequest(
+            approvalRequestId = "approval-${System.currentTimeMillis()}-$sessionId",
+            sessionId = sessionId,
+            decisionId = "workflow-decision-$sessionId-${System.currentTimeMillis()}",
+            toolId = toolId,
+            toolDisplayName = toolDisplayName,
+            sideEffectLabel = sideEffectLabel,
+            scopeLines = scopeLines,
+            previewLines = previewLines,
+            title = title,
+            summary = summary,
+            previewPayload = previewPayload,
+            primaryActionLabel = appStrings.get(R.string.approval_action_approve),
+            secondaryActionLabel = appStrings.get(R.string.approval_action_reject),
+            localeTag = appStrings.localeTag(),
+            status = ApprovalRequestStatus.PENDING,
+        )
+        approvalDao.upsertApprovalRequest(approvalRequest)
+        return approvalRequest
+    }
+
     private fun buildPreviewPayload(
         request: RuntimeRequest,
         contextPayload: RuntimeContextPayload,

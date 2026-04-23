@@ -2,14 +2,19 @@ package com.mobileclaw.app.ui.agentworkspace
 
 import com.mobileclaw.app.runtime.localchat.LocalModelProfile
 import com.mobileclaw.app.runtime.localchat.ModelAvailabilityStatus
+import com.mobileclaw.app.runtime.systemsource.SystemSourceDescriptor
 import com.mobileclaw.app.ui.agentworkspace.model.ApprovalUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.AutomationAreaUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.AttachmentUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.AuditUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.ChatTurnUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.ContextInspectorUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.GovernanceCenterUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.KnowledgeAreaUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.KnowledgeRequestSupportUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.ModelHealthUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.PortabilityBundlePreviewUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.RuntimeContributionUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.RuntimeControlCenterUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.RuntimeStatusUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.WorkspaceAttentionMode
@@ -37,10 +42,15 @@ data class AgentWorkspaceUiState(
     val activeAssistantTurnId: String? = null,
     val runtimeStatus: RuntimeStatusUiModel = RuntimeStatusUiModel(),
     val contextInspector: ContextInspectorUiModel = ContextInspectorUiModel(),
+    val knowledgeArea: KnowledgeAreaUiModel = KnowledgeAreaUiModel(),
+    val knowledgeRequestSupport: KnowledgeRequestSupportUiModel = KnowledgeRequestSupportUiModel(),
+    val automationArea: AutomationAreaUiModel = AutomationAreaUiModel(),
     val portabilityPreview: PortabilityBundlePreviewUiModel? = null,
     val governanceCenter: GovernanceCenterUiModel = GovernanceCenterUiModel(),
     val pendingApproval: ApprovalUiModel? = null,
     val recentAudit: List<AuditUiModel> = emptyList(),
+    val systemSourceDescriptors: List<SystemSourceDescriptor> = emptyList(),
+    val contributionOutcomes: List<RuntimeContributionUiModel> = emptyList(),
     val composerDraft: String = "",
     val isComposerEnabled: Boolean = false,
     val isBusy: Boolean = false,

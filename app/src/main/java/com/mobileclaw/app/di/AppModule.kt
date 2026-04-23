@@ -13,6 +13,7 @@ import com.mobileclaw.app.runtime.memory.MemoryRetrievalService
 import com.mobileclaw.app.runtime.memory.MemoryWritebackService
 import com.mobileclaw.app.runtime.memory.PersonaMemoryContextLoader
 import com.mobileclaw.app.runtime.memory.ScopedMemoryRepository
+import com.mobileclaw.app.runtime.knowledge.KnowledgeDao
 import com.mobileclaw.app.runtime.action.StructuredActionNormalizer
 import com.mobileclaw.app.runtime.ingress.ExternalEntryRegistration
 import com.mobileclaw.app.runtime.ingress.ExternalEntryStatus
@@ -52,6 +53,7 @@ import com.mobileclaw.app.runtime.session.RuntimeSessionFacade
 import com.mobileclaw.app.runtime.session.RuntimeSessionOrchestrator
 import com.mobileclaw.app.runtime.session.RuntimeSessionRegistry
 import com.mobileclaw.app.runtime.strings.AppStrings
+import com.mobileclaw.app.runtime.workflow.WorkflowDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -133,6 +135,16 @@ object AppModule {
     fun provideGovernanceDao(
         database: MemoryDatabase,
     ): GovernanceDao = database.governanceDao()
+
+    @Provides
+    fun provideKnowledgeDao(
+        database: MemoryDatabase,
+    ): KnowledgeDao = database.knowledgeDao()
+
+    @Provides
+    fun provideWorkflowDao(
+        database: MemoryDatabase,
+    ): WorkflowDao = database.workflowDao()
 
     @Provides
     @Singleton

@@ -25,55 +25,6 @@ import org.json.JSONObject
 private const val IMPORTED_MODELS_DIR = "imported_models"
 private val IMPORTED_MODELS_KEY = stringPreferencesKey("imported_models_json")
 private val NON_MODEL_CHARACTERS = Regex("[^a-z0-9]+")
-private val IMAGE_CAPABILITY_HINTS = listOf(
-    "vision",
-    "visual",
-    "image",
-    "multimodal",
-    "multi modal",
-    "omni",
-    "vl",
-    "vlm",
-    "llava",
-    "paligemma",
-    "gemini",
-    "gemma 3",
-    "gemma3",
-    "gemma 3n",
-    "gemma3n",
-    "qwen vl",
-    "qwen 2 vl",
-    "qwen2 vl",
-    "qwen 2 5 vl",
-    "qwen2 5 vl",
-    "internvl",
-    "pixtral",
-    "molmo",
-    "fuyu",
-    "minicpm v",
-    "glm 4v",
-    "glm4v",
-    "janus",
-    "vision language",
-)
-private val AUDIO_CAPABILITY_HINTS = listOf(
-    "audio",
-    "speech",
-    "voice",
-    "multimodal",
-    "multi modal",
-    "omni",
-    "gemini",
-    "gemma 3n",
-    "gemma3n",
-    "whisper",
-    "asr",
-    "tts",
-    "listen",
-    "hearing",
-    "qwen omni",
-    "qwen2 audio",
-)
 
 @Singleton
 class ImportedLocalModelCatalog @Inject constructor(
@@ -116,22 +67,25 @@ class ImportedLocalModelCatalog @Inject constructor(
             rawJson = storedPreferences[IMPORTED_MODELS_KEY].orEmpty(),
         ).map { record ->
             val modelFile = File(record.filePath)
-            val isReady = modelFile.exists()
+            val isPresent = modelFile.exists()
+            val runtimeFailureMessage = record.runtimeFailureMessage?.takeIf { it.isNotBlank() }
+            val availabilityStatus = when {
+                !isPresent -> ModelAvailabilityStatus.FAILED
+                runtimeFailureMessage != null -> ModelAvailabilityStatus.FAILED
+                else -> ModelAvailabilityStatus.READY
+            }
+            val statusMessage = when {
+                !isPresent -> appStrings.get(R.string.model_imported_file_missing)
+                runtimeFailureMessage != null -> runtimeFailureMessage
+                else -> appStrings.get(R.string.model_imported_from, record.originalFileName)
+            }
             LocalModelProfile(
                 modelId = record.modelId,
                 displayName = record.displayName,
                 providerLabel = appStrings.get(R.string.model_provider_imported_file),
-                availabilityStatus = if (isReady) {
-                    ModelAvailabilityStatus.READY
-                } else {
-                    ModelAvailabilityStatus.FAILED
-                },
-                statusMessage = if (isReady) {
-                    appStrings.get(R.string.model_imported_from, record.originalFileName)
-                } else {
-                    appStrings.get(R.string.model_imported_file_missing)
-                },
-                isSelectable = isReady,
+                availabilityStatus = availabilityStatus,
+                statusMessage = statusMessage,
+                isSelectable = isPresent,
                 modalityCapabilities = record.resolveCapabilities(),
                 supportsManualCapabilityOverride = true,
             )
@@ -170,23 +124,27 @@ class ImportedLocalModelCatalog @Inject constructor(
         return models.first().firstOrNull { it.modelId == modelId && it.isSelectable }
     }
 
+    override suspend fun clearModelRuntimeFailure(modelId: String): LocalModelProfile? {
+        updateImportedModel(modelId) { record ->
+            if (record.runtimeFailureMessage == null) {
+                record
+            } else {
+                record.copy(runtimeFailureMessage = null)
+            }
+        }
+        return models.first().firstOrNull { it.modelId == modelId }
+    }
+
     override suspend fun updateModelCapabilities(
         modelId: String,
         supportsImage: Boolean,
         supportsAudio: Boolean,
     ): LocalModelProfile? {
-        preferences.edit { storedPreferences ->
-            val updated = readImportedModels(storedPreferences[IMPORTED_MODELS_KEY].orEmpty()).map { record ->
-                if (record.modelId == modelId) {
-                    record.copy(
-                        manualSupportsImage = supportsImage,
-                        manualSupportsAudio = supportsAudio,
-                    )
-                } else {
-                    record
-                }
-            }
-            storedPreferences[IMPORTED_MODELS_KEY] = updated.toJson()
+        updateImportedModel(modelId) { record ->
+            record.copy(
+                manualSupportsImage = supportsImage,
+                manualSupportsAudio = supportsAudio,
+            )
         }
         return models.first().firstOrNull { it.modelId == modelId }
     }
@@ -225,6 +183,7 @@ class ImportedLocalModelCatalog @Inject constructor(
                 displayName = displayName,
                 originalFileName = originalFileName,
                 filePath = destinationFile.absolutePath,
+                runtimeFailureMessage = null,
             )
             persistImportedModel(modelRecord)
 
@@ -256,6 +215,31 @@ class ImportedLocalModelCatalog @Inject constructor(
         }
     }
 
+    suspend fun markRuntimeFailure(
+        modelId: String,
+        message: String,
+    ) {
+        updateImportedModel(modelId) { record ->
+            record.copy(runtimeFailureMessage = message)
+        }
+    }
+
+    private suspend fun updateImportedModel(
+        modelId: String,
+        transform: (ImportedModelRecord) -> ImportedModelRecord,
+    ) {
+        preferences.edit { storedPreferences ->
+            val updated = readImportedModels(storedPreferences[IMPORTED_MODELS_KEY].orEmpty()).map { record ->
+                if (record.modelId == modelId) {
+                    transform(record)
+                } else {
+                    record
+                }
+            }
+            storedPreferences[IMPORTED_MODELS_KEY] = updated.toJson()
+        }
+    }
+
     private fun readImportedModels(rawJson: String): List<ImportedModelRecord> {
         if (rawJson.isBlank()) {
             return emptyList()
@@ -271,6 +255,8 @@ class ImportedLocalModelCatalog @Inject constructor(
                             displayName = item.optString("displayName"),
                             originalFileName = item.optString("originalFileName"),
                             filePath = item.optString("filePath"),
+                            runtimeFailureMessage = item.optString("runtimeFailureMessage")
+                                .takeIf { item.has("runtimeFailureMessage") && it.isNotBlank() },
                             manualSupportsImage = item.optBoolean("manualSupportsImage")
                                 .takeIf { item.has("manualSupportsImage") },
                             manualSupportsAudio = item.optBoolean("manualSupportsAudio")
@@ -322,13 +308,6 @@ class ImportedLocalModelCatalog @Inject constructor(
         )
     }
 
-    private fun inferCapabilities(
-        displayName: String,
-        originalFileName: String,
-    ): ModelModalityCapabilities {
-        return inferModelCapabilities(displayName, originalFileName)
-    }
-
     private fun createModelId(
         displayName: String,
         fileName: String,
@@ -350,6 +329,7 @@ private data class ImportedModelRecord(
     val displayName: String,
     val originalFileName: String,
     val filePath: String,
+    val runtimeFailureMessage: String? = null,
     val manualSupportsImage: Boolean? = null,
     val manualSupportsAudio: Boolean? = null,
 )
@@ -381,27 +361,20 @@ private fun String.toDisplayName(): String {
         .ifBlank { "Imported Model" }
 }
 
-internal fun inferModelCapabilities(
-    displayName: String,
-    originalFileName: String,
-): ModelModalityCapabilities {
-    val normalizedHaystack = normalizeCapabilityHint(
-        listOf(displayName, originalFileName).joinToString(separator = " "),
-    )
-    return ModelModalityCapabilities(
-        supportsImage = IMAGE_CAPABILITY_HINTS.any { normalizedHaystack.hasCapabilityHint(it) },
-        supportsAudio = AUDIO_CAPABILITY_HINTS.any { normalizedHaystack.hasCapabilityHint(it) },
+private fun ImportedModelRecord.resolveCapabilities(): ModelModalityCapabilities {
+    return resolveImportedModelCapabilities(
+        manualSupportsImage = manualSupportsImage,
+        manualSupportsAudio = manualSupportsAudio,
     )
 }
 
-private fun ImportedModelRecord.resolveCapabilities(): ModelModalityCapabilities {
-    val inferred = inferModelCapabilities(
-        displayName = displayName,
-        originalFileName = originalFileName,
-    )
+internal fun resolveImportedModelCapabilities(
+    manualSupportsImage: Boolean?,
+    manualSupportsAudio: Boolean?,
+): ModelModalityCapabilities {
     return ModelModalityCapabilities(
-        supportsImage = manualSupportsImage ?: inferred.supportsImage,
-        supportsAudio = manualSupportsAudio ?: inferred.supportsAudio,
+        supportsImage = manualSupportsImage ?: false,
+        supportsAudio = manualSupportsAudio ?: false,
     )
 }
 
@@ -414,23 +387,11 @@ private fun List<ImportedModelRecord>.toJson(): String {
                     put("displayName", model.displayName)
                     put("originalFileName", model.originalFileName)
                     put("filePath", model.filePath)
+                    model.runtimeFailureMessage?.let { put("runtimeFailureMessage", it) }
                     model.manualSupportsImage?.let { put("manualSupportsImage", it) }
                     model.manualSupportsAudio?.let { put("manualSupportsAudio", it) }
                 },
             )
         }
     }.toString()
-}
-
-private fun normalizeCapabilityHint(value: String): String {
-    return value
-        .lowercase()
-        .replace(Regex("[^a-z0-9]+"), " ")
-        .trim()
-}
-
-private fun String.hasCapabilityHint(keyword: String): Boolean {
-    val normalizedKeyword = normalizeCapabilityHint(keyword)
-    if (normalizedKeyword.isBlank()) return false
-    return (" $this ").contains(" $normalizedKeyword ")
 }

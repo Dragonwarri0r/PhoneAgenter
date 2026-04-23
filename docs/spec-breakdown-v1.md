@@ -123,6 +123,15 @@ Recommended follow-on specs right after that:
 - `020-knowledge-ingestion-and-retrieval`
 - `021-workflow-graph-and-automation`
 
+Before or alongside `019`, a short `018.x` control-surface hardening pass is still reasonable as long as it stays inside the existing runtime-control-center track and does **not** become a new top-level spec.
+
+That hardening should stay focused on:
+
+- a `session tray` for active context, pending approval, running actions, and recent activity
+- regrouping the control center into `Now / Capabilities / Policy / Knowledge / Automation`
+- a shared summary/detail template for core runtime objects
+- basic reversible extension management such as enable/disable, visibility, pinning, and default approval mode
+
 ## Relationship to v0
 
 `001-006` stay valid and complete the `v0` foundation.

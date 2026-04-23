@@ -22,6 +22,7 @@ data class ManagedArtifactEntryUiModel(
     val title: String,
     val summary: String = "",
     val statusLine: String = "",
+    val detailLines: List<String> = emptyList(),
     val actionLabel: String = "",
     val isEditable: Boolean = false,
     val unavailableReason: String = "",

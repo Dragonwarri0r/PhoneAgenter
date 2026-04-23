@@ -18,6 +18,16 @@ data class GovernanceCallerSnapshot(
 data class GovernanceCenterSnapshot(
     val callers: List<GovernanceCallerSnapshot>,
     val activities: List<GovernanceActivityItem>,
+    val contributors: List<GovernanceContributorItem> = emptyList(),
+)
+
+data class GovernanceContributorItem(
+    val contributionId: String,
+    val title: String,
+    val availabilityLabel: String,
+    val summary: String,
+    val governanceLines: List<String> = emptyList(),
+    val limitationSummary: String = "",
 )
 
 data class GovernanceDecisionSnapshot(

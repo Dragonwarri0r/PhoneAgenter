@@ -2,6 +2,9 @@ package com.mobileclaw.app.runtime.session
 
 import com.mobileclaw.app.R
 import com.mobileclaw.app.runtime.action.ActionNormalizationResult
+import com.mobileclaw.app.runtime.contribution.ContextContribution
+import com.mobileclaw.app.runtime.contribution.ContributionOutcomeRecord
+import com.mobileclaw.app.runtime.contribution.KnowledgeRequestContribution
 import com.mobileclaw.app.runtime.intent.RuntimeIntentHeuristics
 import com.mobileclaw.app.runtime.multimodal.RuntimeAttachment
 import com.mobileclaw.app.runtime.systemsource.SystemSourceContribution
@@ -71,6 +74,9 @@ data class RuntimeContextPayload(
     val selectedMemoryIds: List<String> = emptyList(),
     val systemSourceDescriptors: List<SystemSourceDescriptor> = emptyList(),
     val systemSourceContributions: List<SystemSourceContribution> = emptyList(),
+    val contextContributions: List<ContextContribution> = emptyList(),
+    val knowledgeContribution: KnowledgeRequestContribution? = null,
+    val contributionOutcomes: List<ContributionOutcomeRecord> = emptyList(),
 )
 
 data class RuntimePlan(

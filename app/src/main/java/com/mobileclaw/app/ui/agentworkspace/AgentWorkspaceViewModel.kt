@@ -5,11 +5,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mobileclaw.app.R
 import com.mobileclaw.app.runtime.capability.CallerTrustState
+import com.mobileclaw.app.runtime.contribution.ContributionOutcomeRecord
+import com.mobileclaw.app.runtime.contribution.RuntimeContributionAvailabilityState
+import com.mobileclaw.app.runtime.contribution.RuntimeContributionRegistry
 import com.mobileclaw.app.runtime.extension.RuntimeExtensionRegistry
 import com.mobileclaw.app.runtime.governance.GovernanceGrantState
 import com.mobileclaw.app.runtime.governance.GovernanceRepository
 import com.mobileclaw.app.runtime.governance.GovernanceTrustMode
 import com.mobileclaw.app.runtime.governance.governanceEditableScopes
+import com.mobileclaw.app.runtime.knowledge.KnowledgeAvailabilityState
+import com.mobileclaw.app.runtime.knowledge.KnowledgeConfidenceLabel
+import com.mobileclaw.app.runtime.knowledge.KnowledgeRedactionState
+import com.mobileclaw.app.runtime.knowledge.ManagedKnowledgeAsset
+import com.mobileclaw.app.runtime.knowledge.ManagedKnowledgeService
 import com.mobileclaw.app.runtime.ingress.ExternalHandoffCoordinator
 import com.mobileclaw.app.runtime.ingress.ExternalHandoffEvent
 import com.mobileclaw.app.runtime.ingress.ExternalRuntimeRequestMapper
@@ -43,10 +51,21 @@ import com.mobileclaw.app.runtime.session.RuntimeSessionEvent
 import com.mobileclaw.app.runtime.session.RuntimeSessionFacade
 import com.mobileclaw.app.runtime.session.RuntimeTranscriptEntry
 import com.mobileclaw.app.runtime.session.RuntimeTranscriptRole
+import com.mobileclaw.app.runtime.systemsource.SystemSourceDescriptor
 import com.mobileclaw.app.runtime.systemsource.SystemSourceRepository
+import com.mobileclaw.app.runtime.workflow.ManagedWorkflowDefinition
+import com.mobileclaw.app.runtime.workflow.ManagedWorkflowRun
+import com.mobileclaw.app.runtime.workflow.ManagedWorkflowService
+import com.mobileclaw.app.runtime.workflow.ManagedWorkflowStep
+import com.mobileclaw.app.runtime.workflow.WorkflowAvailabilityState
+import com.mobileclaw.app.runtime.workflow.WorkflowAutomationSnapshot
+import com.mobileclaw.app.runtime.workflow.WorkflowRunState
+import com.mobileclaw.app.runtime.workflow.WorkflowStepType
+import com.mobileclaw.app.runtime.workflow.WorkflowTemplateOption
 import com.mobileclaw.app.ui.agentworkspace.model.toUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.AttachmentUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.AuditUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.AutomationAreaUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.ChatRoleUi
 import com.mobileclaw.app.ui.agentworkspace.model.ChatTurnStateUi
 import com.mobileclaw.app.ui.agentworkspace.model.ChatTurnUiModel
@@ -55,15 +74,25 @@ import com.mobileclaw.app.ui.agentworkspace.model.ContextMemoryUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.GovernanceActivityUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.GovernanceCallerUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.GovernanceCenterUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.GovernanceContributorUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.GovernanceOptionUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.GovernanceScopeGrantUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.KnowledgeAreaUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.KnowledgeRequestSupportUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.ManagedKnowledgeEntryUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.ModelHealthUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.PortabilityBundlePreviewUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.PortabilityCompatibilityUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.ManagedArtifactEntryUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.RuntimeContributionUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.RuntimeControlCenterUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.RuntimeStatusUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.RuntimeTraceSectionUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.WorkflowDefinitionUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.WorkflowRunBannerUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.WorkflowRunUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.WorkflowStepUiModel
+import com.mobileclaw.app.ui.agentworkspace.model.WorkflowTemplateUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.WorkspaceAttentionMode
 import com.mobileclaw.app.ui.agentworkspace.model.WorkspaceFeedbackKind
 import com.mobileclaw.app.ui.agentworkspace.model.WorkspaceFeedbackUiModel
@@ -101,7 +130,10 @@ class AgentWorkspaceViewModel @Inject constructor(
     private val portabilityBundleShareService: PortabilityBundleShareService,
     private val governanceRepository: GovernanceRepository,
     private val systemSourceRepository: SystemSourceRepository,
+    private val managedKnowledgeService: ManagedKnowledgeService,
+    private val managedWorkflowService: ManagedWorkflowService,
     private val runtimeExtensionRegistry: RuntimeExtensionRegistry,
+    private val runtimeContributionRegistry: RuntimeContributionRegistry,
     private val appStrings: AppStrings,
 ) : ViewModel() {
 
@@ -119,6 +151,8 @@ class AgentWorkspaceViewModel @Inject constructor(
     private var externalHandoffJob: Job? = null
     private var governanceJob: Job? = null
     private var systemSourceJob: Job? = null
+    private var knowledgeJob: Job? = null
+    private var automationJob: Job? = null
 
     init {
         observeModels()
@@ -126,6 +160,8 @@ class AgentWorkspaceViewModel @Inject constructor(
         observeExternalHandoffs()
         observeGovernanceCenter()
         observeSystemSources()
+        observeKnowledgeArea()
+        observeAutomationArea()
         refreshExtensionDiscovery()
     }
 
@@ -138,6 +174,7 @@ class AgentWorkspaceViewModel @Inject constructor(
 
     fun onSelectModel(modelId: String) {
         viewModelScope.launch {
+            localModelCatalog.clearModelRuntimeFailure(modelId)
             localModelCatalog.selectModel(modelId)?.let { selected ->
                 bindSelectedModel(selected)
             }
@@ -205,6 +242,173 @@ class AgentWorkspaceViewModel @Inject constructor(
                     scope = "model_capability_override",
                 ),
             )
+        }
+    }
+
+    fun onCreateWorkflowFromTemplate(templateId: String) {
+        viewModelScope.launch {
+            managedWorkflowService.createWorkflowFromTemplate(templateId)
+                .onSuccess { definition ->
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "workflow-created-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.SUCCESS,
+                            text = appStrings.get(
+                                R.string.workflow_feedback_created,
+                                definition.title,
+                            ),
+                            scope = "workflow",
+                        ),
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "workflow-create-failed-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.ERROR,
+                            text = error.message ?: appStrings.get(R.string.workflow_feedback_definition_missing),
+                            scope = "workflow",
+                        ),
+                    )
+                }
+        }
+    }
+
+    fun onToggleWorkflowEnabled(
+        workflowDefinitionId: String,
+        enabled: Boolean,
+    ) {
+        viewModelScope.launch {
+            managedWorkflowService.setWorkflowEnabled(
+                workflowDefinitionId = workflowDefinitionId,
+                enabled = enabled,
+            ).onSuccess { definition ->
+                _uiState.value = _uiState.value.copy(
+                    feedback = WorkspaceFeedbackUiModel(
+                        messageId = "workflow-enable-${System.currentTimeMillis()}",
+                        kind = WorkspaceFeedbackKind.INFO,
+                        text = if (enabled) {
+                            appStrings.get(R.string.workflow_feedback_enabled, definition.title)
+                        } else {
+                            appStrings.get(R.string.workflow_feedback_disabled, definition.title)
+                        },
+                        scope = "workflow",
+                    ),
+                )
+            }.onFailure { error ->
+                _uiState.value = _uiState.value.copy(
+                    feedback = WorkspaceFeedbackUiModel(
+                        messageId = "workflow-enable-failed-${System.currentTimeMillis()}",
+                        kind = WorkspaceFeedbackKind.ERROR,
+                        text = error.message ?: appStrings.get(R.string.workflow_feedback_definition_missing),
+                        scope = "workflow",
+                    ),
+                )
+            }
+        }
+    }
+
+    fun onStartWorkflow(workflowDefinitionId: String) {
+        viewModelScope.launch {
+            managedWorkflowService.startWorkflowRun(workflowDefinitionId)
+                .onSuccess { run ->
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "workflow-run-start-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.SUCCESS,
+                            text = appStrings.get(R.string.workflow_feedback_run_started, run.title),
+                            scope = "workflow",
+                        ),
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "workflow-run-start-failed-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.ERROR,
+                            text = error.message ?: appStrings.get(R.string.workflow_feedback_run_missing),
+                            scope = "workflow",
+                        ),
+                    )
+                }
+        }
+    }
+
+    fun onResumeWorkflowRun(workflowRunId: String) {
+        viewModelScope.launch {
+            managedWorkflowService.resumeWorkflowRun(workflowRunId)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "workflow-run-resume-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.INFO,
+                            text = appStrings.get(R.string.workflow_feedback_run_resumed),
+                            scope = "workflow",
+                        ),
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "workflow-run-resume-failed-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.ERROR,
+                            text = error.message ?: appStrings.get(R.string.workflow_feedback_run_not_resumable),
+                            scope = "workflow",
+                        ),
+                    )
+                }
+        }
+    }
+
+    fun onPauseWorkflowRun(workflowRunId: String) {
+        viewModelScope.launch {
+            managedWorkflowService.pauseWorkflowRun(workflowRunId)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "workflow-run-pause-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.INFO,
+                            text = appStrings.get(R.string.workflow_feedback_run_paused),
+                            scope = "workflow",
+                        ),
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "workflow-run-pause-failed-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.ERROR,
+                            text = error.message ?: appStrings.get(R.string.workflow_feedback_run_missing),
+                            scope = "workflow",
+                        ),
+                    )
+                }
+        }
+    }
+
+    fun onCancelWorkflowRun(workflowRunId: String) {
+        viewModelScope.launch {
+            managedWorkflowService.cancelWorkflowRun(workflowRunId)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "workflow-run-cancel-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.INFO,
+                            text = appStrings.get(R.string.workflow_feedback_run_cancelled),
+                            scope = "workflow",
+                        ),
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "workflow-run-cancel-failed-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.ERROR,
+                            text = error.message ?: appStrings.get(R.string.workflow_feedback_run_missing),
+                            scope = "workflow",
+                        ),
+                    )
+                }
         }
     }
 
@@ -399,6 +603,135 @@ class AgentWorkspaceViewModel @Inject constructor(
         systemSourceRepository.refresh()
     }
 
+    fun onIngestKnowledgeDocuments(sourceUris: List<Uri>) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                feedback = WorkspaceFeedbackUiModel(
+                    messageId = "knowledge-ingest-start-${System.currentTimeMillis()}",
+                    kind = WorkspaceFeedbackKind.INFO,
+                    text = appStrings.get(R.string.knowledge_feedback_ingest_started),
+                    scope = "knowledge",
+                ),
+            )
+            managedKnowledgeService.ingestDocuments(sourceUris)
+                .onSuccess { asset ->
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "knowledge-ingest-success-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.SUCCESS,
+                            text = appStrings.get(R.string.knowledge_feedback_ingest_success, asset.title),
+                            scope = "knowledge",
+                        ),
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "knowledge-ingest-failed-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.ERROR,
+                            text = appStrings.get(
+                                R.string.knowledge_feedback_ingest_failed,
+                                error.message ?: appStrings.get(R.string.knowledge_feedback_asset_missing),
+                            ),
+                            scope = "knowledge",
+                        ),
+                    )
+                }
+        }
+    }
+
+    fun onRefreshKnowledgeAsset(knowledgeAssetId: String) {
+        viewModelScope.launch {
+            val title = _uiState.value.knowledgeArea.entries.firstOrNull {
+                it.knowledgeAssetId == knowledgeAssetId
+            }?.title ?: appStrings.get(R.string.knowledge_asset_untitled)
+            managedKnowledgeService.refreshAsset(knowledgeAssetId)
+                .onSuccess { asset ->
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "knowledge-refresh-success-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.SUCCESS,
+                            text = appStrings.get(R.string.knowledge_feedback_refresh_success, asset.title),
+                            scope = "knowledge",
+                        ),
+                    )
+                }
+                .onFailure {
+                    _uiState.value = _uiState.value.copy(
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "knowledge-refresh-failed-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.ERROR,
+                            text = appStrings.get(R.string.knowledge_feedback_refresh_failed, title),
+                            scope = "knowledge",
+                        ),
+                    )
+                }
+        }
+    }
+
+    fun onToggleKnowledgeRetrievalInclusion(
+        knowledgeAssetId: String,
+        included: Boolean,
+    ) {
+        viewModelScope.launch {
+            val title = _uiState.value.knowledgeArea.entries.firstOrNull {
+                it.knowledgeAssetId == knowledgeAssetId
+            }?.title ?: appStrings.get(R.string.knowledge_asset_untitled)
+            managedKnowledgeService.setRetrievalIncluded(
+                knowledgeAssetId = knowledgeAssetId,
+                included = included,
+            ).onSuccess { asset ->
+                _uiState.value = _uiState.value.copy(
+                    feedback = WorkspaceFeedbackUiModel(
+                        messageId = "knowledge-toggle-success-${System.currentTimeMillis()}",
+                        kind = WorkspaceFeedbackKind.SUCCESS,
+                        text = appStrings.get(
+                            R.string.knowledge_feedback_toggle_success,
+                            asset.title,
+                            if (included) {
+                                appStrings.get(R.string.knowledge_action_include)
+                            } else {
+                                appStrings.get(R.string.knowledge_action_exclude)
+                            },
+                        ),
+                        scope = "knowledge",
+                    ),
+                )
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(
+                    feedback = WorkspaceFeedbackUiModel(
+                        messageId = "knowledge-toggle-failed-${System.currentTimeMillis()}",
+                        kind = WorkspaceFeedbackKind.ERROR,
+                        text = appStrings.get(R.string.knowledge_feedback_toggle_failed, title),
+                        scope = "knowledge",
+                    ),
+                )
+            }
+        }
+    }
+
+    fun onToggleContributionAvailability(contributionId: String) {
+        val registration = runtimeContributionRegistry.registration(contributionId) ?: return
+        val updatedState = runtimeContributionRegistry.toggleAvailability(contributionId) ?: return
+        refreshExtensionDiscovery()
+        systemSourceRepository.refresh()
+        viewModelScope.launch {
+            refreshContextInspector()
+        }
+        _uiState.value = _uiState.value.copy(
+            feedback = WorkspaceFeedbackUiModel(
+                messageId = "contribution-toggle-${System.currentTimeMillis()}",
+                kind = WorkspaceFeedbackKind.SUCCESS,
+                text = appStrings.get(
+                    R.string.runtime_contribution_toggle_feedback,
+                    registration.displayName,
+                    appStrings.contributionAvailabilityLabel(updatedState),
+                ),
+                scope = "runtime_contribution",
+            ),
+        )
+    }
+
     fun onSendClicked() {
         val state = _uiState.value
         val model = state.activeModel ?: return
@@ -501,6 +834,7 @@ class AgentWorkspaceViewModel @Inject constructor(
                                 timestampLabel = formatTimestamp(activity.timestamp),
                             )
                         },
+                        contributors = _uiState.value.governanceCenter.contributors,
                     ),
                 )
             }
@@ -512,10 +846,60 @@ class AgentWorkspaceViewModel @Inject constructor(
         systemSourceJob = viewModelScope.launch {
             systemSourceRepository.observeDescriptors().collectLatest { descriptors ->
                 _uiState.value = _uiState.value.copy(
+                    systemSourceDescriptors = descriptors,
                     runtimeStatus = _uiState.value.runtimeStatus.copy(
                         systemSourceStatusLines = descriptors.map { it.availabilitySummary },
                         hasMissingSystemSourcePermissions = descriptors.any { !it.isGranted },
                     ),
+                )
+            }
+        }
+    }
+
+    private fun observeKnowledgeArea() {
+        knowledgeJob?.cancel()
+        knowledgeJob = viewModelScope.launch {
+            managedKnowledgeService.observeCorpus().collectLatest { snapshot ->
+                _uiState.value = _uiState.value.copy(
+                    knowledgeArea = KnowledgeAreaUiModel(
+                        title = appStrings.get(R.string.knowledge_center_title),
+                        headline = appStrings.get(R.string.knowledge_center_headline),
+                        supportingText = if (snapshot.totalAssetCount == 0) {
+                            appStrings.get(R.string.knowledge_center_supporting_text)
+                        } else {
+                            appStrings.get(
+                                R.string.runtime_control_knowledge_assets_count,
+                                snapshot.totalAssetCount,
+                            )
+                        },
+                        emptyState = appStrings.get(R.string.knowledge_center_empty),
+                        entries = snapshot.assets
+                            .sortedWith(
+                                compareByDescending<ManagedKnowledgeAsset> { it.retrievalIncluded }
+                                    .thenByDescending { it.lastRetrievedAtEpochMillis ?: Long.MIN_VALUE }
+                                    .thenByDescending { it.lastKnownFreshnessEpochMillis ?: Long.MIN_VALUE }
+                                    .thenByDescending { it.updatedAtEpochMillis },
+                            )
+                            .map(::toManagedKnowledgeEntryUiModel),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun observeAutomationArea() {
+        automationJob?.cancel()
+        automationJob = viewModelScope.launch {
+            managedWorkflowService.observeAutomationCenter().collectLatest { snapshot ->
+                val currentPendingApproval = _uiState.value.pendingApproval
+                val workflowApproval = snapshot.activeApprovalRequest?.toUiModel()
+                _uiState.value = _uiState.value.copy(
+                    automationArea = toAutomationAreaUiModel(snapshot),
+                    pendingApproval = when {
+                        currentPendingApproval == null -> workflowApproval
+                        currentPendingApproval.sessionId.startsWith("workflow-run-") -> workflowApproval
+                        else -> currentPendingApproval
+                    },
                 )
             }
         }
@@ -656,6 +1040,7 @@ class AgentWorkspaceViewModel @Inject constructor(
             role = ChatRoleUi.USER,
             content = visibleInput,
             state = ChatTurnStateUi.COMPLETE,
+            attachments = activeAttachments,
         )
         val assistantTurn = ChatTurnUiModel(
             turnId = "assistant-pending-${System.currentTimeMillis()}",
@@ -676,6 +1061,8 @@ class AgentWorkspaceViewModel @Inject constructor(
             composerDraft = "",
             pendingAttachments = emptyList(),
             activeAttachments = activeAttachments,
+            contributionOutcomes = emptyList(),
+            knowledgeRequestSupport = KnowledgeRequestSupportUiModel(),
             isBusy = true,
             isComposerEnabled = false,
             screenState = WorkspaceScreenState.STREAMING,
@@ -695,6 +1082,11 @@ class AgentWorkspaceViewModel @Inject constructor(
                 uriGrantLabel = sourceMetadata?.grantSummary.orEmpty(),
                 routeSummary = "",
                 callerTrust = sourceMetadata?.trustReason.orEmpty(),
+                contributionSummaryLines = emptyList(),
+                contributionDetailLines = emptyList(),
+                knowledgeSupportLines = emptyList(),
+                knowledgeCitationLines = emptyList(),
+                knowledgeLimitationSummary = "",
                 extensionStatusLines = state.runtimeStatus.extensionStatusLines,
                 isBusy = true,
                 awaitingInput = false,
@@ -726,6 +1118,172 @@ class AgentWorkspaceViewModel @Inject constructor(
             DateFormat.SHORT,
             DateFormat.SHORT,
         ).format(Date(epochMillis))
+    }
+
+    private fun toAutomationAreaUiModel(
+        snapshot: WorkflowAutomationSnapshot,
+    ): AutomationAreaUiModel {
+        val activeRunStates = setOf(
+            WorkflowRunState.RUNNING,
+            WorkflowRunState.AWAITING_APPROVAL,
+            WorkflowRunState.PAUSED,
+            WorkflowRunState.RESUMABLE,
+        )
+        val activeRunByDefinition = snapshot.runs
+            .filter { it.runState in activeRunStates }
+            .groupBy { it.workflowDefinitionId }
+            .mapValues { (_, runs) -> runs.maxByOrNull { it.updatedAtEpochMillis } }
+        return AutomationAreaUiModel(
+            title = appStrings.get(R.string.workflow_center_title),
+            headline = snapshot.summaryHeadline,
+            supportingText = snapshot.summarySupportingText,
+            templateOptions = snapshot.templateOptions.map(::toWorkflowTemplateUiModel),
+            definitions = snapshot.definitions.map { definition ->
+                toWorkflowDefinitionUiModel(
+                    definition = definition,
+                    activeRun = activeRunByDefinition[definition.workflowDefinitionId],
+                )
+            },
+            runs = snapshot.runs.map(::toWorkflowRunUiModel),
+            activeRunBanner = snapshot.activeRun?.let(::toWorkflowRunBannerUiModel),
+        )
+    }
+
+    private fun toWorkflowTemplateUiModel(
+        option: WorkflowTemplateOption,
+    ): WorkflowTemplateUiModel {
+        return WorkflowTemplateUiModel(
+            templateId = option.templateId,
+            title = option.title,
+            summary = option.summary,
+            detailLines = option.detailLines,
+        )
+    }
+
+    private fun toWorkflowDefinitionUiModel(
+        definition: ManagedWorkflowDefinition,
+        activeRun: ManagedWorkflowRun?,
+    ): WorkflowDefinitionUiModel {
+        val detailLines = buildList {
+            add(definition.triggerSummary)
+            definition.lastRunState?.let { add(appStrings.workflowRunStateLabel(it)) }
+            definition.lastRunAtEpochMillis?.let { add(formatTimestamp(it)) }
+        }.filter { it.isNotBlank() }
+        val hasActiveRun = activeRun != null
+        val canStart = !hasActiveRun &&
+            definition.availabilityState != WorkflowAvailabilityState.DISABLED &&
+            definition.availabilityState != WorkflowAvailabilityState.BLOCKED
+        return WorkflowDefinitionUiModel(
+            workflowDefinitionId = definition.workflowDefinitionId,
+            title = definition.title,
+            entrySummary = definition.entrySummary,
+            availabilityState = definition.availabilityState,
+            availabilityLabel = appStrings.workflowAvailabilityLabel(definition.availabilityState),
+            availabilityReason = definition.availabilityReason,
+            statusLine = listOf(
+                appStrings.workflowAvailabilityLabel(definition.availabilityState),
+                definition.lastRunState?.let(appStrings::workflowRunStateLabel),
+            ).filterNotNull().joinToString(separator = " · "),
+            lastRunSummary = definition.lastRunSummary,
+            isEnabled = definition.isEnabled,
+            hasActiveRun = hasActiveRun,
+            canStart = canStart,
+            actionHint = activeRun?.nextRequiredAction?.takeIf { it.isNotBlank() }
+                ?: if (hasActiveRun) {
+                    appStrings.get(R.string.workflow_feedback_run_already_active)
+                } else {
+                    definition.availabilityReason
+                },
+            stepCountLabel = appStrings.get(
+                R.string.workflow_step_count,
+                definition.stepCount,
+            ),
+            steps = definition.steps.map(::toWorkflowStepUiModel),
+            triggerSummary = definition.triggerSummary,
+            detailLines = detailLines,
+        )
+    }
+
+    private fun toWorkflowStepUiModel(
+        step: ManagedWorkflowStep,
+    ): WorkflowStepUiModel {
+        return WorkflowStepUiModel(
+            workflowStepId = step.workflowStepId,
+            ordinalLabel = appStrings.get(R.string.workflow_step_ordinal, step.ordinal + 1),
+            title = step.title,
+            summary = step.summary,
+            stepType = step.stepType,
+            stepTypeLabel = appStrings.workflowStepTypeLabel(step.stepType),
+            requiredInputsLine = step.requiredInputs
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString(separator = " · ")
+                .orEmpty(),
+            transitionLine = step.nextTransitionRule,
+        )
+    }
+
+    private fun toWorkflowRunUiModel(
+        run: ManagedWorkflowRun,
+    ): WorkflowRunUiModel {
+        val primaryAction = when (run.runState) {
+            WorkflowRunState.PAUSED,
+            WorkflowRunState.RESUMABLE,
+            WorkflowRunState.AWAITING_APPROVAL -> appStrings.get(R.string.workflow_action_resume)
+            WorkflowRunState.RUNNING -> appStrings.get(R.string.workflow_action_pause)
+            else -> ""
+        }
+        val secondaryAction = when (run.runState) {
+            WorkflowRunState.RUNNING,
+            WorkflowRunState.PAUSED,
+            WorkflowRunState.RESUMABLE,
+            WorkflowRunState.AWAITING_APPROVAL -> appStrings.get(R.string.workflow_action_cancel)
+            else -> ""
+        }
+        return WorkflowRunUiModel(
+            workflowRunId = run.workflowRunId,
+            workflowDefinitionId = run.workflowDefinitionId,
+            title = run.title,
+            runState = run.runState,
+            runStateLabel = appStrings.workflowRunStateLabel(run.runState),
+            statusLine = listOf(
+                appStrings.workflowRunStateLabel(run.runState),
+                formatTimestamp(run.updatedAtEpochMillis),
+            ).joinToString(separator = " · "),
+            lastCheckpointSummary = run.lastCheckpointSummary,
+            nextRequiredAction = run.nextRequiredAction,
+            outcomeHeadline = run.outcomeHeadline,
+            outcomeDetails = run.outcomeDetails,
+            recoveryGuidance = run.recoveryGuidance,
+            recentActivityLines = run.recentActivityLines,
+            provenanceLines = run.provenanceLines,
+            checkpointState = run.checkpoint?.checkpointState,
+            checkpointLabel = run.checkpoint?.checkpointState?.let(appStrings::workflowCheckpointStateLabel).orEmpty(),
+            primaryActionLabel = primaryAction,
+            secondaryActionLabel = secondaryAction,
+            tertiaryActionLabel = appStrings.get(R.string.common_manage),
+        )
+    }
+
+    private fun toWorkflowRunBannerUiModel(
+        run: ManagedWorkflowRun,
+    ): WorkflowRunBannerUiModel {
+        return WorkflowRunBannerUiModel(
+            workflowRunId = run.workflowRunId,
+            title = run.title,
+            statusLine = listOf(
+                appStrings.workflowRunStateLabel(run.runState),
+                run.lastCheckpointSummary,
+            ).filter { it.isNotBlank() }.joinToString(separator = " · "),
+            nextRequiredAction = run.nextRequiredAction,
+            primaryActionLabel = when (run.runState) {
+                WorkflowRunState.RUNNING -> appStrings.get(R.string.workflow_action_pause)
+                WorkflowRunState.PAUSED,
+                WorkflowRunState.RESUMABLE,
+                WorkflowRunState.AWAITING_APPROVAL -> appStrings.get(R.string.workflow_action_resume)
+                else -> appStrings.get(R.string.common_manage)
+            },
+            secondaryActionLabel = appStrings.get(R.string.common_manage),
+        )
     }
 
     private fun handleRuntimeEvent(event: RuntimeSessionEvent) {
@@ -760,6 +1318,11 @@ class AgentWorkspaceViewModel @Inject constructor(
                         uriGrantLabel = _uiState.value.runtimeStatus.uriGrantLabel,
                         routeSummary = _uiState.value.runtimeStatus.routeSummary,
                         callerTrust = _uiState.value.runtimeStatus.callerTrust,
+                        contributionSummaryLines = _uiState.value.runtimeStatus.contributionSummaryLines,
+                        contributionDetailLines = _uiState.value.runtimeStatus.contributionDetailLines,
+                        knowledgeSupportLines = _uiState.value.runtimeStatus.knowledgeSupportLines,
+                        knowledgeCitationLines = _uiState.value.runtimeStatus.knowledgeCitationLines,
+                        knowledgeLimitationSummary = _uiState.value.runtimeStatus.knowledgeLimitationSummary,
                         extensionStatusLines = _uiState.value.runtimeStatus.extensionStatusLines,
                     ),
                 )
@@ -777,6 +1340,39 @@ class AgentWorkspaceViewModel @Inject constructor(
                             event.contributions.map { it.summary }
                         },
                         hasMissingSystemSourcePermissions = event.descriptors.any { !it.isGranted },
+                    ),
+                )
+            }
+
+            is RuntimeSessionEvent.ContributionsUpdated -> {
+                val outcomeUiModels = event.outcomes.mapNotNull(::toRuntimeContributionUiModel)
+                val knowledgeRequestSupport = toKnowledgeRequestSupportUiModel(event)
+                _uiState.value = _uiState.value.copy(
+                    contributionOutcomes = outcomeUiModels,
+                    knowledgeRequestSupport = knowledgeRequestSupport,
+                    runtimeStatus = _uiState.value.runtimeStatus.copy(
+                        contributionSummaryLines = outcomeUiModels.map { model ->
+                            appStrings.get(
+                                R.string.runtime_contribution_summary_line,
+                                model.title,
+                                model.statusLabel,
+                                model.summary,
+                            )
+                        },
+                        contributionDetailLines = outcomeUiModels.map { model ->
+                            val detail = listOf(
+                                model.lifecycleLabel.takeIf { it.isNotBlank() },
+                                model.details.takeIf { it.isNotBlank() },
+                            ).joinToString(separator = " · ")
+                            appStrings.get(
+                                R.string.runtime_contribution_detail_line,
+                                model.title,
+                                detail.ifBlank { model.statusLabel },
+                            )
+                        },
+                        knowledgeSupportLines = knowledgeRequestSupport.summaryLines,
+                        knowledgeCitationLines = knowledgeRequestSupport.citationLines,
+                        knowledgeLimitationSummary = knowledgeRequestSupport.limitationSummary,
                     ),
                 )
             }
@@ -800,6 +1396,11 @@ class AgentWorkspaceViewModel @Inject constructor(
                         structuredCompleteness = _uiState.value.runtimeStatus.structuredCompleteness,
                         structuredFieldLines = _uiState.value.runtimeStatus.structuredFieldLines,
                         structuredWarnings = _uiState.value.runtimeStatus.structuredWarnings,
+                        contributionSummaryLines = _uiState.value.runtimeStatus.contributionSummaryLines,
+                        contributionDetailLines = _uiState.value.runtimeStatus.contributionDetailLines,
+                        knowledgeSupportLines = _uiState.value.runtimeStatus.knowledgeSupportLines,
+                        knowledgeCitationLines = _uiState.value.runtimeStatus.knowledgeCitationLines,
+                        knowledgeLimitationSummary = _uiState.value.runtimeStatus.knowledgeLimitationSummary,
                         extensionStatusLines = _uiState.value.runtimeStatus.extensionStatusLines,
                         systemSourceStatusLines = _uiState.value.runtimeStatus.systemSourceStatusLines,
                         systemSourceContributionLines = _uiState.value.runtimeStatus.systemSourceContributionLines,
@@ -1033,6 +1634,8 @@ class AgentWorkspaceViewModel @Inject constructor(
             pendingAttachments = emptyList(),
             activeAttachments = emptyList(),
             pendingApproval = null,
+            contributionOutcomes = emptyList(),
+            knowledgeRequestSupport = KnowledgeRequestSupportUiModel(),
                 recentAudit = emptyList(),
                 runtimeStatus = RuntimeStatusUiModel(
                     headline = appStrings.get(R.string.workspace_ready),
@@ -1050,6 +1653,9 @@ class AgentWorkspaceViewModel @Inject constructor(
                     uriGrantLabel = "",
                     routeSummary = "",
                     callerTrust = "",
+                    knowledgeSupportLines = emptyList(),
+                    knowledgeCitationLines = emptyList(),
+                    knowledgeLimitationSummary = "",
                     extensionStatusLines = runtimeExtensionRegistry.discoverySummaries()
                         .take(4)
                         .map { summary ->
@@ -1088,10 +1694,17 @@ class AgentWorkspaceViewModel @Inject constructor(
                     supportingText = appStrings.get(R.string.runtime_policy_approval_resumed),
                 ),
             )
-            runtimeSessionFacade.resolveApprovalRequest(
-                approvalRequestId = approval.approvalRequestId,
-                outcome = ApprovalOutcomeType.APPROVED,
-            )
+            if (approval.sessionId.startsWith("workflow-run-")) {
+                managedWorkflowService.resolveApprovalRequest(
+                    approvalRequestId = approval.approvalRequestId,
+                    outcome = ApprovalOutcomeType.APPROVED,
+                )
+            } else {
+                runtimeSessionFacade.resolveApprovalRequest(
+                    approvalRequestId = approval.approvalRequestId,
+                    outcome = ApprovalOutcomeType.APPROVED,
+                )
+            }
         }
     }
 
@@ -1105,10 +1718,17 @@ class AgentWorkspaceViewModel @Inject constructor(
                     supportingText = appStrings.get(R.string.runtime_policy_approval_rejected),
                 ),
             )
-            runtimeSessionFacade.resolveApprovalRequest(
-                approvalRequestId = approval.approvalRequestId,
-                outcome = ApprovalOutcomeType.REJECTED,
-            )
+            if (approval.sessionId.startsWith("workflow-run-")) {
+                managedWorkflowService.resolveApprovalRequest(
+                    approvalRequestId = approval.approvalRequestId,
+                    outcome = ApprovalOutcomeType.REJECTED,
+                )
+            } else {
+                runtimeSessionFacade.resolveApprovalRequest(
+                    approvalRequestId = approval.approvalRequestId,
+                    outcome = ApprovalOutcomeType.REJECTED,
+                )
+            }
         }
     }
 
@@ -1122,10 +1742,17 @@ class AgentWorkspaceViewModel @Inject constructor(
                     supportingText = appStrings.get(R.string.runtime_policy_approval_abandoned),
                 ),
             )
-            runtimeSessionFacade.resolveApprovalRequest(
-                approvalRequestId = approval.approvalRequestId,
-                outcome = ApprovalOutcomeType.ABANDONED,
-            )
+            if (approval.sessionId.startsWith("workflow-run-")) {
+                managedWorkflowService.resolveApprovalRequest(
+                    approvalRequestId = approval.approvalRequestId,
+                    outcome = ApprovalOutcomeType.ABANDONED,
+                )
+            } else {
+                runtimeSessionFacade.resolveApprovalRequest(
+                    approvalRequestId = approval.approvalRequestId,
+                    outcome = ApprovalOutcomeType.ABANDONED,
+                )
+            }
         }
     }
 
@@ -1425,68 +2052,52 @@ class AgentWorkspaceViewModel @Inject constructor(
         )
         val activeSummary = retrievedContext.toActiveContextSummary(appStrings)
         val memories = retrievedContext.selectedMemoryItems
-        val allCompatibilities = memories.flatMap { exportDecisionService.extensionCompatibilities(it) }
-        val items = memories
-            .map { item ->
-                val mergeCandidate = item.toMergeCandidate()
-                val exportBundle = exportDecisionService.buildExportBundle(item)
-                val extensionCompatibilities = exportDecisionService.extensionCompatibilities(item)
-                ContextMemoryUiModel(
-                    memoryId = item.memoryId,
-                    title = item.title,
-                    detail = item.userVisibleText(),
-                    badge = listOf(
-                        appStrings.memoryLifecycleLabel(item.lifecycle),
-                        appStrings.memoryScopeLabel(item.scope),
-                        appStrings.memorySourceLabel(item.sourceType),
-                    ).joinToString(separator = " · "),
-                    syncDetail = appStrings.get(
-                        R.string.memory_detail_sync,
-                        appStrings.memoryExposureLabel(item.exposurePolicy),
-                        appStrings.memorySyncPolicyLabel(item.syncPolicy),
-                    ),
-                    mergeDetail = appStrings.get(
-                        R.string.memory_detail_merge,
-                        mergeCandidate.logicalRecordId,
-                        mergeCandidate.logicalVersion,
-                        mergeCandidate.originDeviceId ?: "local_device",
-                    ),
-                    exportDetail = appStrings.get(
-                        R.string.memory_detail_export,
-                        appStrings.exportModeLabel(exportBundle.exportMode),
-                        exportBundle.redactedFields.joinToString().ifBlank {
-                            appStrings.get(R.string.memory_detail_none)
-                        },
-                    ),
-                    extensionDetail = appStrings.get(
-                        R.string.memory_detail_extensions,
-                        extensionCompatibilities.count { it.isCompatible },
-                        extensionCompatibilities
-                            .filter { it.isCompatible }
-                            .joinToString(separator = ", ") {
-                                "${it.displayName} (${appStrings.extensionTypeLabel(it.extensionType)})"
-                            }
-                            .ifBlank { appStrings.get(R.string.memory_detail_none) },
-                    ),
-                    isPinned = item.isPinned,
-                    canPromote = item.lifecycle != MemoryLifecycle.DURABLE,
-                    canDemote = item.lifecycle != MemoryLifecycle.EPHEMERAL,
-                    canExpire = !item.isPinned,
-                    canExport = item.exposurePolicy != MemoryExposurePolicy.PRIVATE,
-                )
-            }
+        val items = memories.map { item ->
+            ContextMemoryUiModel(
+                memoryId = item.memoryId,
+                title = item.title,
+                content = item.userVisibleText(),
+                summary = item.summaryText,
+                badges = buildList {
+                    add(appStrings.memoryLifecycleLabel(item.lifecycle))
+                    add(appStrings.memoryScopeLabel(item.scope))
+                    add(appStrings.memorySourceLabel(item.sourceType))
+                    if (item.isPinned) add(appStrings.get(R.string.common_pin))
+                },
+                policyLine = appStrings.get(
+                    R.string.memory_detail_sync,
+                    appStrings.memoryExposureLabel(item.exposurePolicy),
+                    appStrings.memorySyncPolicyLabel(item.syncPolicy),
+                ),
+                provenanceLine = appStrings.get(
+                    R.string.memory_detail_merge,
+                    item.logicalRecordId,
+                    item.logicalVersion,
+                    item.originDeviceId ?: "local_device",
+                ),
+                isPinned = item.isPinned,
+                canPromote = item.lifecycle != MemoryLifecycle.DURABLE,
+                canDemote = item.lifecycle != MemoryLifecycle.EPHEMERAL,
+                canExpire = !item.isPinned,
+                canExport = item.exposurePolicy != MemoryExposurePolicy.PRIVATE,
+            )
+        }
         _uiState.value = _uiState.value.copy(
             contextInspector = ContextInspectorUiModel(
+                title = appStrings.get(R.string.workspace_memory_title),
                 personaSummary = personaSummary,
+                headline = if (items.isEmpty()) {
+                    appStrings.get(R.string.workspace_memory_empty)
+                } else {
+                    appStrings.get(R.string.runtime_control_memory_active_count, items.size)
+                },
+                supportingText = activeSummary.retrievalSummary,
+                emptyState = appStrings.get(R.string.workspace_memory_empty),
                 activeMemoryItems = items,
                 hiddenPrivateCount = retrievedContext.hiddenPrivateCount,
                 totalEligibleCount = retrievedContext.totalEligibleCount,
                 excludedCount = retrievedContext.excludedCount,
                 retrievalSummary = activeSummary.retrievalSummary,
-                extensionSummary = appStrings.get(
-                    R.string.memory_extension_summary,
-                    allCompatibilities.size,
-                ),
             ),
             runtimeStatus = _uiState.value.runtimeStatus.copy(
                 extensionStatusLines = runtimeExtensionRegistry.discoverySummaries()
@@ -1507,6 +2118,175 @@ class AgentWorkspaceViewModel @Inject constructor(
                         "${summary.displayName} (${appStrings.extensionTypeLabel(summary.extensionType)}) · ${summary.privacySummary} · ${summary.statusSummary}"
                     },
             ),
+        )
+    }
+
+    private fun toManagedKnowledgeEntryUiModel(asset: ManagedKnowledgeAsset): ManagedKnowledgeEntryUiModel {
+        return ManagedKnowledgeEntryUiModel(
+            knowledgeAssetId = asset.knowledgeAssetId,
+            title = asset.title,
+            statusLine = appStrings.get(
+                R.string.knowledge_status_line,
+                appStrings.knowledgeAvailabilityLabel(asset.availabilityState),
+                appStrings.knowledgeIngestionStateLabel(asset.ingestionState),
+            ),
+            freshnessLine = asset.lastKnownFreshnessEpochMillis?.let { freshness ->
+                appStrings.get(R.string.knowledge_freshness_at, formatTimestamp(freshness))
+            } ?: appStrings.get(R.string.knowledge_freshness_unknown),
+            usageSummary = asset.lastRetrievedAtEpochMillis?.let { lastUsedAt ->
+                appStrings.get(
+                    R.string.knowledge_usage_recent,
+                    asset.retrievalCount,
+                    formatTimestamp(lastUsedAt),
+                )
+            } ?: appStrings.get(R.string.knowledge_usage_never),
+            provenanceLabel = listOf(
+                appStrings.knowledgeSourceTypeLabel(asset.sourceType),
+                asset.provenanceLabel,
+            ).filter { it.isNotBlank() }.joinToString(separator = " · "),
+            detailLines = buildList {
+                asset.ingestionSummary.takeIf { it.isNotBlank() }?.let(::add)
+                asset.currentScopeSummary.takeIf { it.isNotBlank() }?.let(::add)
+                asset.lastErrorSummary.takeIf { it.isNotBlank() }?.let(::add)
+            },
+            citationLines = buildList {
+                asset.lastRetrievalSummary.takeIf { it.isNotBlank() }?.let(::add)
+                addAll(asset.lastCitationLabels.take(3))
+            },
+            limitationSummary = asset.reasonIfUnavailable.takeIf { it.isNotBlank() }.orEmpty(),
+            canRefresh = asset.supportsRefresh,
+            canToggleRetrievalInclusion = asset.supportsRetrievalInclusionChange,
+            retrievalIncluded = asset.retrievalIncluded,
+        )
+    }
+
+    private fun toKnowledgeRequestSupportUiModel(
+        event: RuntimeSessionEvent.ContributionsUpdated,
+    ): KnowledgeRequestSupportUiModel {
+        val knowledgeContribution = event.knowledgeContribution ?: return KnowledgeRequestSupportUiModel()
+        return KnowledgeRequestSupportUiModel(
+            summaryLines = knowledgeContribution.supportSummaries.map { support ->
+                appStrings.get(
+                    R.string.knowledge_support_line,
+                    support.summary,
+                    appStrings.knowledgeConfidenceLabel(support.confidenceLabel),
+                    support.provenanceLabel,
+                )
+            },
+            citationLines = knowledgeContribution.citations.map { citation ->
+                appStrings.get(
+                    R.string.knowledge_citation_line,
+                    citation.sourceLabel,
+                    appStrings.knowledgeRedactionLabel(citation.redactionState),
+                    citation.relevanceSummary,
+                )
+            },
+            limitationSummary = knowledgeContribution.limitationSummary,
+        )
+    }
+
+    private fun decorateContributionUiModels(
+        contributions: List<RuntimeContributionUiModel>,
+        descriptors: List<SystemSourceDescriptor>,
+    ): List<RuntimeContributionUiModel> {
+        return contributions.map { contribution ->
+            val registration = runtimeContributionRegistry.registration(contribution.contributionId) ?: return@map contribution
+            val availabilityState = runtimeContributionRegistry.availabilityState(contribution.contributionId)
+            contribution.copy(
+                availabilityLabel = appStrings.contributionAvailabilityLabel(availabilityState),
+                actionLabel = contributionActionLabel(
+                    contributionId = contribution.contributionId,
+                    supportsAvailabilityChange = registration.supportsAvailabilityChange,
+                ),
+                governanceLines = contributionGovernanceLines(contribution.contributionId),
+                limitationSummary = contributionLimitationSummary(
+                    contributionId = contribution.contributionId,
+                    baseLimitation = contribution.limitationSummary,
+                    descriptors = descriptors,
+                ),
+            )
+        }
+    }
+
+    private fun contributionActionLabel(
+        contributionId: String,
+        supportsAvailabilityChange: Boolean,
+    ): String {
+        if (!supportsAvailabilityChange) return ""
+        return if (runtimeContributionRegistry.availabilityState(contributionId) ==
+            RuntimeContributionAvailabilityState.DISABLED
+        ) {
+            appStrings.get(R.string.runtime_contribution_action_enable)
+        } else {
+            appStrings.get(R.string.runtime_contribution_action_disable)
+        }
+    }
+
+    private fun contributionGovernanceLines(contributionId: String): List<String> {
+        val governance = runtimeContributionRegistry.governanceDetails(contributionId) ?: return emptyList()
+        return buildList {
+            governance.trustSummary.takeIf { it.isNotBlank() }?.let { add(appStrings.contributionTrustLine(it)) }
+            governance.scopeSummary.takeIf { it.isNotBlank() }?.let { add(appStrings.contributionScopeLine(it)) }
+            governance.privacySummary.takeIf { it.isNotBlank() }?.let { add(appStrings.contributionPrivacyLine(it)) }
+            governance.policySummary.takeIf { it.isNotBlank() }?.let { add(appStrings.contributionPolicyLine(it)) }
+            governance.dependencySummary.takeIf { it.isNotBlank() }?.let { add(appStrings.contributionDependencyLine(it)) }
+        }
+    }
+
+    private fun contributionLimitationSummary(
+        contributionId: String,
+        baseLimitation: String,
+        descriptors: List<SystemSourceDescriptor>,
+    ): String {
+        val governanceLimitation = runtimeContributionRegistry.governanceDetails(contributionId)
+            ?.limitationSummary
+            .orEmpty()
+        if (governanceLimitation.isNotBlank()) return appStrings.contributionLimitationLine(governanceLimitation)
+        val descriptorLimitation = contributionSystemSourceDescriptor(
+            contributionId = contributionId,
+            descriptors = descriptors,
+        )?.takeIf { !it.isGranted }?.availabilitySummary.orEmpty()
+        if (descriptorLimitation.isNotBlank()) return appStrings.contributionLimitationLine(descriptorLimitation)
+        return baseLimitation.takeIf { it.isNotBlank() }?.let(appStrings::contributionLimitationLine).orEmpty()
+    }
+
+    private fun contributionSystemSourceDescriptor(
+        contributionId: String,
+        descriptors: List<SystemSourceDescriptor>,
+    ): SystemSourceDescriptor? {
+        return descriptors.firstOrNull { descriptor ->
+            runtimeContributionRegistry.systemSourceContributionId(descriptor.sourceId) == contributionId
+        }
+    }
+
+    private fun toRuntimeContributionUiModel(
+        outcome: ContributionOutcomeRecord,
+    ): RuntimeContributionUiModel? {
+        val registration = runtimeContributionRegistry.registration(outcome.contributionId) ?: return null
+        val availabilityState = runtimeContributionRegistry.availabilityState(outcome.contributionId)
+        return RuntimeContributionUiModel(
+            contributionId = outcome.contributionId,
+            title = registration.displayName,
+            lifecycleLabel = appStrings.contributionLifecyclePointLabel(outcome.lifecyclePoint),
+            statusLabel = appStrings.contributionOutcomeLabel(outcome.outcomeState),
+            summary = outcome.summary,
+            details = listOf(
+                outcome.details.takeIf { it.isNotBlank() },
+                outcome.policyReason.takeIf { it.isNotBlank() && it != outcome.summary },
+            ).joinToString(separator = " · "),
+            availabilityLabel = appStrings.contributionAvailabilityLabel(availabilityState),
+            actionLabel = contributionActionLabel(
+                contributionId = outcome.contributionId,
+                supportsAvailabilityChange = registration.supportsAvailabilityChange,
+            ),
+            supportsAvailabilityChange = registration.supportsAvailabilityChange,
+            limitationSummary = when (outcome.outcomeState) {
+                com.mobileclaw.app.runtime.contribution.ContributionOutcomeState.BLOCKED,
+                com.mobileclaw.app.runtime.contribution.ContributionOutcomeState.DEGRADED,
+                com.mobileclaw.app.runtime.contribution.ContributionOutcomeState.UNAVAILABLE,
+                -> outcome.policyReason.ifBlank { outcome.details }
+                else -> ""
+            },
         )
     }
 
@@ -1593,6 +2373,12 @@ class AgentWorkspaceViewModel @Inject constructor(
                 } else {
                     _uiState.value = _uiState.value.copy(
                         pendingAttachments = _uiState.value.pendingAttachments + toAttachmentUiModel(attachment),
+                        feedback = WorkspaceFeedbackUiModel(
+                            messageId = "attachment-added-${System.currentTimeMillis()}",
+                            kind = WorkspaceFeedbackKind.SUCCESS,
+                            text = appStrings.get(R.string.multimodal_attachment_added, attachment.displayName),
+                            scope = "multimodal_attachment",
+                        ),
                     )
                 }
             }.onFailure { error ->
@@ -1669,77 +2455,151 @@ class AgentWorkspaceViewModel @Inject constructor(
     }
 
     private fun decorateWorkspaceUiState(state: AgentWorkspaceUiState): AgentWorkspaceUiState {
+        val decoratedContributions = decorateContributionUiModels(
+            contributions = state.contributionOutcomes,
+            descriptors = state.systemSourceDescriptors,
+        )
+        val decoratedState = state.copy(
+            contributionOutcomes = decoratedContributions,
+            runtimeStatus = state.runtimeStatus.copy(
+                contributionSummaryLines = decoratedContributions.map { contribution ->
+                    appStrings.get(
+                        R.string.runtime_contribution_summary_line,
+                        contribution.title,
+                        contribution.statusLabel,
+                        contribution.summary,
+                    )
+                },
+                contributionDetailLines = decoratedContributions.flatMap { contribution ->
+                    listOfNotNull(
+                        contribution.details.takeIf { it.isNotBlank() }?.let {
+                            appStrings.get(
+                                R.string.runtime_contribution_detail_line,
+                                contribution.title,
+                                it,
+                            )
+                        },
+                        contribution.governanceLines.firstOrNull(),
+                        contribution.limitationSummary.takeIf { it.isNotBlank() },
+                    )
+                }.take(6),
+            ),
+            governanceCenter = state.governanceCenter.copy(
+                contributors = buildGovernanceContributorEntries(
+                    contributions = decoratedContributions,
+                    descriptors = state.systemSourceDescriptors,
+                ),
+            ),
+        )
         val attentionMode = when {
-            state.pendingApproval != null || state.screenState == WorkspaceScreenState.AWAITING_APPROVAL ->
+            decoratedState.pendingApproval != null || decoratedState.screenState == WorkspaceScreenState.AWAITING_APPROVAL ->
                 WorkspaceAttentionMode.AWAITING_APPROVAL
-            state.screenState == WorkspaceScreenState.RECOVERABLE_FAILURE ->
+            decoratedState.screenState == WorkspaceScreenState.RECOVERABLE_FAILURE ->
                 WorkspaceAttentionMode.FAILURE
-            state.screenState == WorkspaceScreenState.PREPARING ->
+            decoratedState.screenState == WorkspaceScreenState.PREPARING ->
                 WorkspaceAttentionMode.PREPARING
-            state.screenState == WorkspaceScreenState.UNAVAILABLE ->
+            decoratedState.screenState == WorkspaceScreenState.UNAVAILABLE ->
                 WorkspaceAttentionMode.UNAVAILABLE
             else -> WorkspaceAttentionMode.NORMAL
         }
         val primarySignals = buildList {
-            state.runtimeStatus.sourceLabel.takeIf { it.isNotBlank() }?.let(::add)
-            state.runtimeStatus.trustStateLabel.takeIf { it.isNotBlank() }?.let(::add)
-            state.runtimeStatus.routeSummary.takeIf { it.isNotBlank() }?.let(::add)
-            state.runtimeStatus.structuredActionTitle.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.sourceLabel.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.trustStateLabel.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.routeSummary.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.structuredActionTitle.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.knowledgeSupportLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.contributionSummaryLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.automationArea.activeRunBanner?.statusLine?.takeIf { it.isNotBlank() }?.let(::add)
         }.take(4)
         val secondarySignals = buildList {
-            state.runtimeStatus.systemSourceContributionLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
-            state.runtimeStatus.systemSourceStatusLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
-            state.recentAudit.firstOrNull()?.headline?.takeIf { it.isNotBlank() }?.let(::add)
-            state.runtimeStatus.callerTrust.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.systemSourceContributionLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.systemSourceStatusLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.knowledgeLimitationSummary.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.contributionDetailLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.recentAudit.firstOrNull()?.headline?.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.callerTrust.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.automationArea.activeRunBanner?.nextRequiredAction?.takeIf { it.isNotBlank() }?.let(::add)
         }.take(2)
-        val modelSummary = modelAvailabilityLabel(state.activeModel?.availabilityStatus)
-        val contextSummary = if (state.contextInspector.activeMemoryItems.isEmpty()) {
-            state.contextInspector.retrievalSummary
+        val modelSummary = modelAvailabilityLabel(decoratedState.activeModel?.availabilityStatus)
+        val contextSummary = if (decoratedState.contextInspector.activeMemoryItems.isEmpty()) {
+            decoratedState.contextInspector.retrievalSummary
         } else {
             appStrings.get(
                 R.string.workspace_secondary_context_summary,
-                state.contextInspector.activeMemoryItems.size,
+                decoratedState.contextInspector.activeMemoryItems.size,
             )
         }
-        val governanceSummary = if (state.governanceCenter.callers.isEmpty()) {
+        val governanceSummary = if (decoratedState.governanceCenter.callers.isEmpty()) {
             appStrings.get(R.string.common_manage)
         } else {
             appStrings.get(
                 R.string.workspace_secondary_governance_summary,
-                state.governanceCenter.callers.size,
+                decoratedState.governanceCenter.callers.size,
             )
         }
-        val detailSummary = state.recentAudit.firstOrNull()?.headline
-            ?: state.runtimeStatus.stageLabel
-        return state.copy(
+        val knowledgeSummary = if (decoratedState.knowledgeArea.entries.isEmpty()) {
+            appStrings.get(R.string.knowledge_center_empty)
+        } else {
+            appStrings.get(
+                R.string.workspace_secondary_knowledge_summary,
+                decoratedState.knowledgeArea.entries.size,
+            )
+        }
+        val automationSummary = decoratedState.automationArea.activeRunBanner?.statusLine
+            ?.takeIf { it.isNotBlank() }
+            ?: if (decoratedState.automationArea.definitions.isEmpty()) {
+                appStrings.get(R.string.workflow_center_empty)
+            } else {
+                appStrings.get(
+                    R.string.workspace_secondary_automation_summary,
+                    decoratedState.automationArea.definitions.size,
+                )
+            }
+        val detailSummary = decoratedState.recentAudit.firstOrNull()?.headline
+            ?: decoratedState.runtimeStatus.stageLabel
+        return decoratedState.copy(
             attentionMode = attentionMode,
             statusDigest = WorkspaceStatusDigestUiModel(
                 attentionMode = attentionMode,
-                stageLabel = state.runtimeStatus.stageLabel,
-                headline = state.runtimeStatus.headline,
-                supportingText = state.runtimeStatus.supportingText,
+                stageLabel = decoratedState.runtimeStatus.stageLabel,
+                headline = decoratedState.runtimeStatus.headline,
+                supportingText = decoratedState.runtimeStatus.supportingText,
                 primarySignals = primarySignals,
                 secondarySignals = secondarySignals,
-                showsPermissionAction = state.runtimeStatus.hasMissingSystemSourcePermissions,
+                showsPermissionAction = decoratedState.runtimeStatus.hasMissingSystemSourcePermissions,
             ),
             secondaryEntries = listOf(
                 WorkspaceSecondaryEntryUiModel(
                     entryId = "model",
                     label = appStrings.get(R.string.workspace_secondary_model),
                     supportingText = modelSummary,
-                    isHighlighted = !state.isModelReady,
+                    isHighlighted = !decoratedState.isModelReady,
                 ),
                 WorkspaceSecondaryEntryUiModel(
                     entryId = "context",
                     label = appStrings.get(R.string.workspace_secondary_context),
                     supportingText = contextSummary,
-                    isHighlighted = state.contextInspector.activeMemoryItems.isNotEmpty(),
+                    isHighlighted = decoratedState.contextInspector.activeMemoryItems.isNotEmpty(),
+                ),
+                WorkspaceSecondaryEntryUiModel(
+                    entryId = "knowledge",
+                    label = appStrings.get(R.string.workspace_secondary_knowledge),
+                    supportingText = knowledgeSummary,
+                    isHighlighted = decoratedState.knowledgeArea.entries.isNotEmpty(),
+                ),
+                WorkspaceSecondaryEntryUiModel(
+                    entryId = "automation",
+                    label = appStrings.get(R.string.workspace_secondary_automation),
+                    supportingText = automationSummary,
+                    isHighlighted = decoratedState.automationArea.activeRunBanner != null ||
+                        decoratedState.automationArea.definitions.isNotEmpty(),
                 ),
                 WorkspaceSecondaryEntryUiModel(
                     entryId = "governance",
                     label = appStrings.get(R.string.workspace_secondary_governance),
                     supportingText = governanceSummary,
-                    isHighlighted = state.governanceCenter.activities.isNotEmpty(),
+                    isHighlighted = decoratedState.governanceCenter.activities.isNotEmpty() ||
+                        decoratedState.governanceCenter.contributors.isNotEmpty(),
                 ),
                 WorkspaceSecondaryEntryUiModel(
                     entryId = "details",
@@ -1748,7 +2608,7 @@ class AgentWorkspaceViewModel @Inject constructor(
                     isHighlighted = attentionMode != WorkspaceAttentionMode.NORMAL,
                 ),
             ),
-            runtimeControlCenter = buildRuntimeControlCenter(state, attentionMode),
+            runtimeControlCenter = buildRuntimeControlCenter(decoratedState, attentionMode),
         )
     }
 
@@ -1766,6 +2626,33 @@ class AgentWorkspaceViewModel @Inject constructor(
             traceSections = buildRuntimeTraceSections(state, attentionMode),
             artifactEntries = buildManagedArtifactEntries(state),
         )
+    }
+
+    private fun buildGovernanceContributorEntries(
+        contributions: List<RuntimeContributionUiModel>,
+        descriptors: List<SystemSourceDescriptor>,
+    ): List<GovernanceContributorUiModel> {
+        val contributionMap = contributions.associateBy { it.contributionId }
+        return runtimeContributionRegistry.manageableRegistrations().map { registration ->
+            val availability = runtimeContributionRegistry.availabilityState(registration.contributionId)
+            val latestOutcome = contributionMap[registration.contributionId]
+            val governanceLines = latestOutcome?.governanceLines ?: contributionGovernanceLines(registration.contributionId)
+            val limitationSummary = latestOutcome?.limitationSummary?.takeIf { it.isNotBlank() }
+                ?: contributionLimitationSummary(
+                    contributionId = registration.contributionId,
+                    baseLimitation = "",
+                    descriptors = descriptors,
+                )
+            GovernanceContributorUiModel(
+                contributionId = registration.contributionId,
+                title = registration.displayName,
+                availabilityLabel = latestOutcome?.availabilityLabel?.takeIf { it.isNotBlank() }
+                    ?: appStrings.contributionAvailabilityLabel(availability),
+                summary = latestOutcome?.summary ?: registration.summaryTemplate,
+                governanceLines = governanceLines,
+                limitationSummary = limitationSummary,
+            )
+        }
     }
 
     private fun buildRuntimeTraceSections(
@@ -1815,6 +2702,38 @@ class AgentWorkspaceViewModel @Inject constructor(
             state.runtimeStatus.systemSourceContributionLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
             state.runtimeStatus.systemSourceStatusLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
         }
+        val knowledgeLines = buildList {
+            addAll(state.runtimeStatus.knowledgeSupportLines.filter { it.isNotBlank() }.take(3))
+            addAll(state.runtimeStatus.knowledgeCitationLines.filter { it.isNotBlank() }.take(2))
+            state.runtimeStatus.knowledgeLimitationSummary.takeIf { it.isNotBlank() }?.let(::add)
+        }.distinct()
+        val contributionLines = buildList {
+            addAll(state.runtimeStatus.contributionSummaryLines.filter { it.isNotBlank() }.take(4))
+            addAll(state.runtimeStatus.contributionDetailLines.filter { it.isNotBlank() }.take(2))
+            addAll(
+                state.contributionOutcomes
+                    .flatMap { contribution ->
+                        listOfNotNull(
+                            contribution.governanceLines.firstOrNull(),
+                            contribution.limitationSummary.takeIf { it.isNotBlank() },
+                        )
+                    }
+                    .take(3),
+            )
+        }.distinct()
+        val automationLines = buildList {
+            state.automationArea.activeRunBanner?.statusLine?.takeIf { it.isNotBlank() }?.let(::add)
+            state.automationArea.activeRunBanner?.nextRequiredAction?.takeIf { it.isNotBlank() }?.let(::add)
+            state.automationArea.definitions.firstOrNull()?.let { definition ->
+                add(
+                    listOf(
+                        definition.title,
+                        definition.availabilityLabel,
+                    ).filter { it.isNotBlank() }.joinToString(separator = " · "),
+                )
+            }
+            addAll(state.automationArea.runs.firstOrNull()?.recentActivityLines.orEmpty().take(2))
+        }.distinct()
         val extensionLines = state.runtimeStatus.extensionStatusLines.filter { it.isNotBlank() }.take(4)
         val constraintLines = buildList {
             state.runtimeStatus.toolVisibilityReason.takeIf { it.isNotBlank() }?.let(::add)
@@ -1862,6 +2781,25 @@ class AgentWorkspaceViewModel @Inject constructor(
                 emptyState = appStrings.get(R.string.runtime_control_empty_context),
             ),
             RuntimeTraceSectionUiModel(
+                sectionId = "knowledge",
+                title = appStrings.get(R.string.runtime_control_section_knowledge),
+                lines = knowledgeLines,
+                emptyState = appStrings.get(R.string.runtime_control_empty_knowledge),
+            ),
+            RuntimeTraceSectionUiModel(
+                sectionId = "contributions",
+                title = appStrings.get(R.string.runtime_control_section_contributions),
+                lines = contributionLines,
+                emptyState = appStrings.get(R.string.runtime_control_empty_contributions),
+            ),
+            RuntimeTraceSectionUiModel(
+                sectionId = "automation",
+                title = appStrings.get(R.string.runtime_control_section_automation),
+                lines = automationLines,
+                emptyState = appStrings.get(R.string.runtime_control_empty_automation),
+                isHighlighted = state.automationArea.activeRunBanner != null,
+            ),
+            RuntimeTraceSectionUiModel(
                 sectionId = "extensions",
                 title = appStrings.get(R.string.runtime_control_section_extensions),
                 lines = extensionLines,
@@ -1887,6 +2825,35 @@ class AgentWorkspaceViewModel @Inject constructor(
         state: AgentWorkspaceUiState,
     ): List<ManagedArtifactEntryUiModel> {
         val extensionCount = state.runtimeStatus.extensionStatusLines.size
+        val contributorEntries = runtimeContributionRegistry.manageableRegistrations().map { registration ->
+            val latestOutcome = state.contributionOutcomes.lastOrNull { it.contributionId == registration.contributionId }
+            val availability = runtimeContributionRegistry.availabilityState(registration.contributionId)
+            val actionLabel = if (availability == RuntimeContributionAvailabilityState.DISABLED) {
+                appStrings.get(R.string.runtime_contribution_action_enable)
+            } else {
+                appStrings.get(R.string.runtime_contribution_action_disable)
+            }
+            ManagedArtifactEntryUiModel(
+                artifactId = "contribution:${registration.contributionId}",
+                title = registration.displayName,
+                summary = latestOutcome?.summary ?: registration.summaryTemplate,
+                statusLine = listOf(
+                    appStrings.contributionAvailabilityLabel(availability),
+                    latestOutcome?.statusLabel,
+                ).filterNotNull().filter { it.isNotBlank() }.joinToString(separator = " · "),
+                detailLines = (latestOutcome?.governanceLines
+                    ?: contributionGovernanceLines(registration.contributionId)).take(4),
+                actionLabel = latestOutcome?.actionLabel?.takeIf { it.isNotBlank() } ?: actionLabel,
+                isEditable = true,
+                unavailableReason = latestOutcome?.limitationSummary
+                    ?.takeIf { it.isNotBlank() }
+                    ?: contributionLimitationSummary(
+                        contributionId = registration.contributionId,
+                        baseLimitation = latestOutcome?.details.orEmpty(),
+                        descriptors = state.systemSourceDescriptors,
+                    ),
+            )
+        }
         return listOf(
             ManagedArtifactEntryUiModel(
                 artifactId = "model",
@@ -1911,6 +2878,48 @@ class AgentWorkspaceViewModel @Inject constructor(
                     )
                 },
                 actionLabel = appStrings.get(R.string.runtime_control_action_inspect_memory),
+                isEditable = true,
+            ),
+            ManagedArtifactEntryUiModel(
+                artifactId = "knowledge",
+                title = appStrings.get(R.string.runtime_control_artifact_knowledge),
+                summary = state.knowledgeRequestSupport.summaryLines.firstOrNull()
+                    ?: state.knowledgeArea.entries.firstOrNull()?.title
+                    ?: appStrings.get(R.string.runtime_control_knowledge_empty),
+                statusLine = if (state.knowledgeArea.entries.isEmpty()) {
+                    appStrings.get(R.string.runtime_control_state_inspect_only)
+                } else {
+                    appStrings.get(
+                        R.string.runtime_control_knowledge_assets_count,
+                        state.knowledgeArea.entries.size,
+                    )
+                },
+                detailLines = listOfNotNull(
+                    state.knowledgeRequestSupport.citationLines.firstOrNull(),
+                    state.knowledgeRequestSupport.limitationSummary.takeIf { it.isNotBlank() },
+                ),
+                actionLabel = appStrings.get(R.string.runtime_control_action_open_knowledge),
+                isEditable = true,
+            ),
+            ManagedArtifactEntryUiModel(
+                artifactId = "automation",
+                title = appStrings.get(R.string.runtime_control_artifact_automation),
+                summary = state.automationArea.activeRunBanner?.statusLine
+                    ?: state.automationArea.definitions.firstOrNull()?.title
+                    ?: appStrings.get(R.string.workflow_center_empty),
+                statusLine = if (state.automationArea.definitions.isEmpty()) {
+                    appStrings.get(R.string.runtime_control_state_inspect_only)
+                } else {
+                    appStrings.get(
+                        R.string.workspace_secondary_automation_summary,
+                        state.automationArea.definitions.size,
+                    )
+                },
+                detailLines = listOfNotNull(
+                    state.automationArea.activeRunBanner?.nextRequiredAction?.takeIf { it.isNotBlank() },
+                    state.automationArea.runs.firstOrNull()?.recoveryGuidance?.takeIf { it.isNotBlank() },
+                ),
+                actionLabel = appStrings.get(R.string.runtime_control_action_open_automation),
                 isEditable = true,
             ),
             ManagedArtifactEntryUiModel(
@@ -1979,7 +2988,7 @@ class AgentWorkspaceViewModel @Inject constructor(
                     ""
                 },
             ),
-        )
+        ) + contributorEntries
     }
 
     private fun modelAvailabilityLabel(status: ModelAvailabilityStatus?): String {

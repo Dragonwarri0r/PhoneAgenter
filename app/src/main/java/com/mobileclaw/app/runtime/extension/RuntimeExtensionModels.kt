@@ -99,6 +99,17 @@ object DefaultRuntimeExtensionRegistrations {
             trustRequirement = ExtensionTrustRequirement.PRIVILEGED_CONTEXT,
         ),
         RuntimeExtensionRegistration(
+            extensionId = "context.calendar.system",
+            extensionType = RuntimeExtensionType.CONTEXT_SOURCE,
+            displayName = "Calendar Context Source",
+            contributedCapabilities = listOf("calendar.read", "system_source.calendar"),
+            requiredRecordFields = emptyList(),
+            requiredRuntimeMetadata = listOf("system_source.calendar"),
+            privacyGuarantee = ExtensionPrivacyGuarantee.TRUSTED_CONTEXT_ONLY,
+            defaultEnablementState = ExtensionEnablementState.DEGRADED,
+            trustRequirement = ExtensionTrustRequirement.PRIVILEGED_CONTEXT,
+        ),
+        RuntimeExtensionRegistration(
             extensionId = "export.summary.bundle",
             extensionType = RuntimeExtensionType.EXPORT,
             displayName = "Summary Bundle Export",

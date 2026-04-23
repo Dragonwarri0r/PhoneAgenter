@@ -3,6 +3,9 @@ package com.mobileclaw.app.runtime.session
 import com.mobileclaw.app.runtime.capability.CallerIdentity
 import com.mobileclaw.app.runtime.capability.ToolVisibilitySnapshot
 import com.mobileclaw.app.runtime.action.ActionNormalizationResult
+import com.mobileclaw.app.runtime.contribution.ContextContribution
+import com.mobileclaw.app.runtime.contribution.ContributionOutcomeRecord
+import com.mobileclaw.app.runtime.contribution.KnowledgeRequestContribution
 import com.mobileclaw.app.runtime.capability.ProviderType
 import com.mobileclaw.app.runtime.ingress.ExternalInvocationRecord
 import com.mobileclaw.app.runtime.policy.ApprovalOutcome
@@ -60,6 +63,12 @@ sealed interface RuntimeSessionEvent {
     data class SystemSourcesPrepared(
         val descriptors: List<SystemSourceDescriptor>,
         val contributions: List<SystemSourceContribution>,
+    ) : RuntimeSessionEvent
+
+    data class ContributionsUpdated(
+        val outcomes: List<ContributionOutcomeRecord>,
+        val contextContributions: List<ContextContribution>,
+        val knowledgeContribution: KnowledgeRequestContribution? = null,
     ) : RuntimeSessionEvent
 
     data class CallerVerified(
