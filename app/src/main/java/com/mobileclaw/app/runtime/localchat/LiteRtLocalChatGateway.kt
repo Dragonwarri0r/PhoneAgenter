@@ -21,10 +21,13 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -196,6 +199,23 @@ class LiteRtLocalChatGateway @Inject constructor(
         )
     }
 
+    override suspend fun generateDetached(
+        modelId: String,
+        generationPrompt: String,
+        attachments: List<RuntimeAttachment>,
+    ): String {
+        val runtimeSession = ensureRuntimeSession(modelId)
+        val detachedConversation = runtimeSession.engine.createConversation(ConversationConfig())
+        return try {
+            runConversation(
+                conversation = detachedConversation,
+                contents = buildContents(generationPrompt, attachments),
+            )
+        } finally {
+            runCatching { detachedConversation.close() }
+        }
+    }
+
     private suspend fun ensureRuntimeSession(modelId: String): LiteRtSession {
         runtimeMutex.withLock {
             runtimeSessions[modelId]?.let { return it }
@@ -284,6 +304,42 @@ class LiteRtLocalChatGateway @Inject constructor(
     private suspend fun sessionStoreUpdateFailure(modelId: String) {
         sessionStore.update(modelId) { session ->
             session.copy(state = SessionLifecycleState.FAILED)
+        }
+    }
+
+    private suspend fun runConversation(
+        conversation: Conversation,
+        contents: Contents,
+    ): String = suspendCancellableCoroutine { continuation ->
+        val response = StringBuilder()
+        runCatching {
+            conversation.sendMessageAsync(
+                contents,
+                object : MessageCallback {
+                    override fun onMessage(message: Message) {
+                        val chunk = message.toString()
+                        if (chunk.isBlank() || chunk.startsWith("<ctrl")) return
+                        response.append(chunk)
+                    }
+
+                    override fun onDone() {
+                        if (continuation.isActive) {
+                            continuation.resume(response.toString().trim())
+                        }
+                    }
+
+                    override fun onError(throwable: Throwable) {
+                        if (continuation.isActive) {
+                            continuation.resumeWithException(throwable)
+                        }
+                    }
+                },
+                emptyMap(),
+            )
+        }.onFailure { throwable ->
+            if (continuation.isActive) {
+                continuation.resumeWithException(throwable)
+            }
         }
     }
 

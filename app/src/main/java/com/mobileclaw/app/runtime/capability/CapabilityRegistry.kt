@@ -8,6 +8,8 @@ import javax.inject.Singleton
 
 @Singleton
 class CapabilityRegistry @Inject constructor(
+    private val readCapabilityBridge: ReadCapabilityBridge,
+    private val mutationCapabilityBridge: MutationCapabilityBridge,
     private val appFunctionBridge: AppFunctionBridge,
     private val intentFallbackBridge: IntentFallbackBridge,
     private val shareFallbackBridge: ShareFallbackBridge,
@@ -19,16 +21,8 @@ class CapabilityRegistry @Inject constructor(
         request: RuntimeRequest,
     ): CapabilityRegistration? {
         val toolDescriptor = standardToolCatalog.descriptorForCapability(capabilityId)
-        val providers = buildList {
-            when (capabilityId) {
-                "generate.reply" -> add(localReplyProvider())
-                else -> {
-                    addAll(appFunctionBridge.discoverProviders(capabilityId, request))
-                    addAll(intentFallbackBridge.discoverProviders(capabilityId, request))
-                    addAll(shareFallbackBridge.discoverProviders(capabilityId, request))
-                }
-            }
-        }.sortedBy { it.priority }
+        val providers = discoverProviders(capabilityId, request).sortedBy { it.priority }
+        val primaryProvider = providers.firstOrNull()
 
         val aggregate = when {
             providers.isEmpty() -> CapabilityAvailabilityState.UNAVAILABLE
@@ -63,15 +57,36 @@ class CapabilityRegistry @Inject constructor(
                     it.availability.state == CapabilityAvailabilityState.AVAILABLE ||
                         it.availability.state == CapabilityAvailabilityState.DEGRADED
                 },
+                primaryProviderId = primaryProvider?.providerId,
             ),
             displayName = toolDescriptor.displayName,
             requiredScopes = toolDescriptor.requiredScopes,
             riskLevelHint = toolDescriptor.riskLevelHint,
             confirmationPolicy = toolDescriptor.confirmationPolicy,
+            invocationKind = toolDescriptor.invocationKind,
+            freeformSelectionPolicy = toolDescriptor.freeformSelectionPolicy,
             supportedExtensionTypes = capabilityExtensionTypes(capabilityId),
             providerDescriptors = providers,
             availability = aggregate,
         )
+    }
+
+    private suspend fun discoverProviders(
+        capabilityId: String,
+        request: RuntimeRequest,
+    ): List<ProviderDescriptor> {
+        return buildList {
+            when (capabilityId) {
+                "generate.reply" -> add(localReplyProvider())
+                else -> {
+                    addAll(readCapabilityBridge.discoverProviders(capabilityId, request))
+                    addAll(mutationCapabilityBridge.discoverProviders(capabilityId, request))
+                    addAll(appFunctionBridge.discoverProviders(capabilityId, request))
+                    addAll(intentFallbackBridge.discoverProviders(capabilityId, request))
+                    addAll(shareFallbackBridge.discoverProviders(capabilityId, request))
+                }
+            }
+        }
     }
 
     private fun localReplyProvider(): ProviderDescriptor {
@@ -99,7 +114,8 @@ class CapabilityRegistry @Inject constructor(
     private fun capabilityExtensionTypes(capabilityId: String): List<String> = when (capabilityId) {
         "generate.reply" -> listOf("provider")
         "calendar.read" -> listOf("provider", "context")
-        "message.send", "calendar.write", "external.share", "alarm.set", "alarm.show", "alarm.dismiss" -> {
+        "contacts.read" -> listOf("provider", "context")
+        "message.send", "calendar.write", "calendar.delete", "external.share", "alarm.set", "alarm.show", "alarm.dismiss" -> {
             listOf("provider", "export")
         }
         "ui.act", "sensitive.write" -> listOf("provider")

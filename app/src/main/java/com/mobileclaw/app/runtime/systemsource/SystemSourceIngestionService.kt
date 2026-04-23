@@ -221,6 +221,7 @@ class SystemSourceIngestionService @Inject constructor(
         userInput: String,
         capabilityId: String,
     ): Boolean {
+        if (capabilityId == "calendar.read") return false
         if (capabilityId == "calendar.write") return true
         val lower = userInput.lowercase()
         return listOf("schedule", "meeting", "calendar", "remind", "安排", "日程", "提醒").any { it in lower }

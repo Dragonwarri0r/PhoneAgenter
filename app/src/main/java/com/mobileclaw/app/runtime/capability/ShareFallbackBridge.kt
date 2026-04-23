@@ -11,12 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-interface ShareFallbackBridge {
-    suspend fun discoverProviders(
-        capabilityId: String,
-        request: RuntimeRequest,
-    ): List<ProviderDescriptor>
-}
+interface ShareFallbackBridge : CapabilityDiscoveryBridge
 
 @Singleton
 class RealShareFallbackBridge @Inject constructor(

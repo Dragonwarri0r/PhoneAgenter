@@ -93,19 +93,43 @@ object RuntimeIntentHeuristics {
             "what's on my calendar",
             "what is on my calendar",
             "show my calendar",
+            "show my schedule",
+            "check my calendar",
+            "what do i have today",
+            "what do i have tomorrow",
             "today on my calendar",
             "today's schedule",
             "my schedule today",
+            "my schedule tomorrow",
             "看看我的日历",
             "我的日程",
             "今天的日程",
+            "明天的日程",
             "查看日历",
+            "今天有什么安排",
+            "明天有什么安排",
+        ),
+        "calendar:delete" to listOf(
+            "delete event",
+            "remove event",
+            "remove from my calendar",
+            "delete from my calendar",
+            "cancel meeting",
+            "delete meeting",
+            "delete calendar event",
+            "删除日程",
+            "删掉日程",
+            "从日历删除",
+            "取消这个会议",
+            "删除这个事件",
         ),
         "calendar:schedule" to listOf(
             "add to my calendar",
             "add this to my calendar",
             "create event",
             "create meeting",
+            "add meeting",
+            "add event",
             "schedule meeting",
             "schedule event",
             "schedule with",
@@ -311,7 +335,14 @@ object RuntimeIntentHeuristics {
             )
         }
 
-        val calendarMatches = collectMatches(matchText, calendarSignals)
+        val calendarMatches = collectMatches(matchText, calendarSignals).ifEmpty {
+            when {
+                looksLikeCalendarRead(matchText) -> listOf("calendar:read")
+                looksLikeCalendarDeletion(matchText) -> listOf("calendar:delete")
+                looksLikeCalendarScheduling(matchText.raw) -> listOf("calendar:schedule")
+                else -> emptyList()
+            }
+        }
         val alarmMatches = collectMatches(matchText, alarmSignals)
         val shareMatches = collectMatches(matchText, shareSignals)
         val messageMatches = collectMatches(matchText, messageSignals)
@@ -324,6 +355,7 @@ object RuntimeIntentHeuristics {
             alarmMatches.any { it == "alarm:set" } -> "alarm.set"
             alarmMatches.any { it == "alarm:dismiss" } -> "alarm.dismiss"
             alarmMatches.any { it == "alarm:show" } -> "alarm.show"
+            calendarMatches.any { it == "calendar:delete" } -> "calendar.delete"
             calendarMatches.any { it == "calendar:read" } -> "calendar.read"
             calendarMatches.isNotEmpty() -> "calendar.write"
             shareMatches.isNotEmpty() -> "external.share"
@@ -336,6 +368,7 @@ object RuntimeIntentHeuristics {
         val capabilityScope = when (capabilityId) {
             "calendar.read" -> ActionScope.CALENDAR_READ
             "calendar.write" -> ActionScope.CALENDAR_WRITE
+            "calendar.delete" -> ActionScope.CALENDAR_DELETE
             "alarm.set" -> ActionScope.ALARM_SET
             "alarm.show" -> ActionScope.ALARM_SHOW
             "alarm.dismiss" -> ActionScope.ALARM_DISMISS
@@ -370,6 +403,7 @@ object RuntimeIntentHeuristics {
         } else {
             val confidence = when (capabilityScope) {
                 ActionScope.CALENDAR_WRITE,
+                ActionScope.CALENDAR_DELETE,
                 ActionScope.CALENDAR_READ,
                 ActionScope.ALARM_SET,
                 ActionScope.ALARM_SHOW,
@@ -417,6 +451,15 @@ object RuntimeIntentHeuristics {
                 capabilityId = "calendar.read",
                 scope = ActionScope.CALENDAR_READ,
                 matchedSignals = listOf("debug:calendar_read_marker"),
+                containsSensitiveContent = false,
+                containsBlockedOperation = false,
+                confidence = 0.99,
+            )
+
+            "[calendar_delete]" in rawInput -> inference(
+                capabilityId = "calendar.delete",
+                scope = ActionScope.CALENDAR_DELETE,
+                matchedSignals = listOf("debug:calendar_delete_marker"),
                 containsSensitiveContent = false,
                 containsBlockedOperation = false,
                 confidence = 0.99,
@@ -525,6 +568,97 @@ object RuntimeIntentHeuristics {
             }
             else -> normalizedPhrase in matchText.raw
         }
+    }
+
+    private fun looksLikeCalendarScheduling(rawInput: String): Boolean {
+        return listOf(
+            Regex("""\b(add|schedule|book|set up)\b.+\b(to my calendar|calendar|meeting|event)\b""", RegexOption.IGNORE_CASE),
+            Regex("""\b(remind me)\b.+\b(today|tomorrow|tonight|next)\b""", RegexOption.IGNORE_CASE),
+            Regex("""(加入日历|安排.+(会议|日程)|创建.+(会议|日程)|提醒我.+(今天|明天|下午|晚上))"""),
+        ).any { it.containsMatchIn(rawInput) }
+    }
+
+    private fun looksLikeCalendarRead(matchText: MatchText): Boolean {
+        val raw = matchText.raw
+        val mentionsCalendar = listOf(
+            "calendar",
+            "schedule",
+            "agenda",
+            "日历",
+            "日程",
+            "安排",
+        ).any(raw::contains)
+        val mentionsLookup = listOf(
+            "what",
+            "show",
+            "check",
+            "read",
+            "look up",
+            "list",
+            "查看",
+            "看看",
+            "查",
+            "查下",
+            "查一下",
+            "看下",
+            "看一下",
+            "有什么",
+        ).any(raw::contains)
+        val mentionsWindow = listOf(
+            "today",
+            "tomorrow",
+            "this week",
+            "tonight",
+            "afternoon",
+            "今天",
+            "明天",
+            "本周",
+            "今晚",
+            "下午",
+        ).any(raw::contains)
+        val hasMutationVerb = listOf(
+            "add",
+            "create",
+            "schedule",
+            "book",
+            "set up",
+            "remove",
+            "delete",
+            "cancel",
+            "安排",
+            "添加",
+            "创建",
+            "加入日历",
+            "删除",
+            "删掉",
+            "取消",
+            "改期",
+            "重新安排",
+        ).any(raw::contains)
+        return mentionsCalendar && !hasMutationVerb && (mentionsLookup || mentionsWindow)
+    }
+
+    private fun looksLikeCalendarDeletion(matchText: MatchText): Boolean {
+        val raw = matchText.raw
+        val deleteVerb = listOf(
+            "delete",
+            "remove",
+            "cancel",
+            "删掉",
+            "删除",
+            "取消",
+        ).any(raw::contains)
+        val calendarContext = listOf(
+            "calendar",
+            "event",
+            "meeting",
+            "schedule",
+            "日历",
+            "日程",
+            "事件",
+            "会议",
+        ).any(raw::contains)
+        return deleteVerb && calendarContext
     }
 
     private fun inference(

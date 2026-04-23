@@ -3,6 +3,7 @@ package com.mobileclaw.app.runtime.provider
 import com.mobileclaw.app.runtime.capability.ProviderDescriptor
 import com.mobileclaw.app.runtime.action.StructuredActionPayload
 import com.mobileclaw.app.runtime.action.StructuredExecutionPreview
+import com.mobileclaw.app.runtime.session.CapabilitySelectionOutcome
 import com.mobileclaw.app.runtime.localchat.SessionResetResult
 import com.mobileclaw.app.runtime.session.RuntimeContextPayload
 import com.mobileclaw.app.runtime.session.RuntimePlan
@@ -17,6 +18,8 @@ data class CapabilityExecutionRequest(
     val providerDescriptor: ProviderDescriptor? = null,
     val structuredPayload: StructuredActionPayload? = plan.structuredAction?.payload,
     val structuredPreview: StructuredExecutionPreview? = plan.structuredAction?.preview,
+    val explicitReadRequest: ExplicitReadToolRequest? = plan.explicitReadRequest,
+    val selectionOutcome: CapabilitySelectionOutcome? = plan.selectionOutcome,
 )
 
 sealed interface ProviderExecutionEvent {
@@ -35,6 +38,7 @@ sealed interface ProviderExecutionEvent {
         val capabilityId: String,
         val providerId: String,
         val outputText: String,
+        val readResult: ReadToolResult? = null,
     ) : ProviderExecutionEvent
 
     data class ExecutionFailed(

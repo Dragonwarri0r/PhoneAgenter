@@ -25,9 +25,13 @@ import com.mobileclaw.app.runtime.systemsource.AndroidSystemSourceRepository
 import com.mobileclaw.app.runtime.systemsource.SystemSourceRepository
 import com.mobileclaw.app.runtime.capability.AppFunctionBridge
 import com.mobileclaw.app.runtime.capability.IntentFallbackBridge
+import com.mobileclaw.app.runtime.capability.LocalMutationCapabilityBridge
 import com.mobileclaw.app.runtime.capability.RealAppFunctionBridge
 import com.mobileclaw.app.runtime.capability.RealIntentFallbackBridge
+import com.mobileclaw.app.runtime.capability.LocalReadCapabilityBridge
+import com.mobileclaw.app.runtime.capability.MutationCapabilityBridge
 import com.mobileclaw.app.runtime.capability.RealShareFallbackBridge
+import com.mobileclaw.app.runtime.capability.ReadCapabilityBridge
 import com.mobileclaw.app.runtime.capability.ShareFallbackBridge
 import com.mobileclaw.app.runtime.capability.CapabilityRouter
 import com.mobileclaw.app.runtime.localchat.LocalChatGateway
@@ -45,6 +49,7 @@ import com.mobileclaw.app.runtime.policy.PolicyDao
 import com.mobileclaw.app.runtime.policy.PolicyEngine
 import com.mobileclaw.app.runtime.policy.PolicyRepository
 import com.mobileclaw.app.runtime.policy.RiskClassifier
+import com.mobileclaw.app.runtime.provider.ReadToolRequestBuilder
 import com.mobileclaw.app.runtime.provider.CapabilityProviderRegistry
 import com.mobileclaw.app.runtime.session.DefaultRuntimePlanner
 import com.mobileclaw.app.runtime.session.RuntimeContextLoader
@@ -190,6 +195,7 @@ object AppModule {
         contextLoader: RuntimeContextLoader,
         planner: RuntimePlanner,
         structuredActionNormalizer: StructuredActionNormalizer,
+        readToolRequestBuilder: ReadToolRequestBuilder,
         riskClassifier: RiskClassifier,
         policyEngine: PolicyEngine,
         policyRepository: PolicyRepository,
@@ -206,6 +212,7 @@ object AppModule {
         contextLoader = contextLoader,
         planner = planner,
         structuredActionNormalizer = structuredActionNormalizer,
+        readToolRequestBuilder = readToolRequestBuilder,
         riskClassifier = riskClassifier,
         policyEngine = policyEngine,
         policyRepository = policyRepository,
@@ -227,6 +234,18 @@ object AppModule {
     fun provideIntentFallbackBridge(
         bridge: RealIntentFallbackBridge,
     ): IntentFallbackBridge = bridge
+
+    @Provides
+    @Singleton
+    fun provideReadCapabilityBridge(
+        bridge: LocalReadCapabilityBridge,
+    ): ReadCapabilityBridge = bridge
+
+    @Provides
+    @Singleton
+    fun provideMutationCapabilityBridge(
+        bridge: LocalMutationCapabilityBridge,
+    ): MutationCapabilityBridge = bridge
 
     @Provides
     @Singleton

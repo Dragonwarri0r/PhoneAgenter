@@ -19,6 +19,7 @@ class RuntimeExtensionRegistry @Inject constructor(
         "activity_share",
         "tool_contract.v1",
         "provider.local",
+        "provider.read.local",
         "system_source.contacts",
         "system_source.calendar",
         "portability.v1",
@@ -41,7 +42,16 @@ class RuntimeExtensionRegistry @Inject constructor(
                 extensionType = registration.extensionType,
                 capabilitySummary = registration.contributedCapabilities.joinToString(separator = ", "),
                 privacySummary = appStrings.extensionPrivacyGuaranteeLabel(registration.privacyGuarantee),
+                providerSurfaceSummary = if (registration.extensionType == RuntimeExtensionType.TOOL_PROVIDER) {
+                    appStrings.extensionProviderSurfaceLabel(registration.providerSurface)
+                } else {
+                    ""
+                },
                 statusSummary = buildString {
+                    if (registration.extensionType == RuntimeExtensionType.TOOL_PROVIDER) {
+                        append(appStrings.extensionProviderSurfaceLabel(registration.providerSurface))
+                        append(" · ")
+                    }
                     append(appStrings.extensionEnablementStateLabel(enablement))
                     append(" · ")
                     append(compatibility.reason)

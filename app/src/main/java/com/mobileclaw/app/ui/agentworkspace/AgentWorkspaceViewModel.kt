@@ -1070,12 +1070,20 @@ class AgentWorkspaceViewModel @Inject constructor(
                 headline = appStrings.get(R.string.workspace_session_started),
                 stageLabel = appStrings.get(R.string.workspace_session_started),
                 supportingText = appStrings.get(R.string.workspace_routing_request),
+                selectionModeLabel = "",
+                selectionReason = "",
+                selectionCandidateLines = emptyList(),
+                selectionWarnings = emptyList(),
                 toolId = "",
                 toolDisplayName = "",
                 toolSideEffectLabel = "",
                 toolScopeLines = emptyList(),
                 toolVisibilityLabel = "",
                 toolVisibilityReason = "",
+                readScopeLabel = "",
+                readPreviewLines = emptyList(),
+                readOutcomeLabel = "",
+                readOutcomeLines = emptyList(),
                 sourceLabel = sourceMetadata?.sourceLabel.orEmpty(),
                 trustStateLabel = sourceMetadata?.let(::trustStateLabel).orEmpty(),
                 interopContractLabel = sourceMetadata?.let(::interopContractLabel).orEmpty(),
@@ -1443,6 +1451,27 @@ class AgentWorkspaceViewModel @Inject constructor(
                 )
             }
 
+            is RuntimeSessionEvent.CapabilitySelectionResolved -> {
+                _uiState.value = _uiState.value.copy(
+                    runtimeStatus = _uiState.value.runtimeStatus.copy(
+                        selectionModeLabel = selectionModeLabel(event.outcome.resolutionMode),
+                        selectionReason = event.outcome.explanation,
+                        selectionCandidateLines = event.outcome.candidateSummaries,
+                        selectionWarnings = event.outcome.warnings,
+                        readScopeLabel = event.explicitReadRequest?.queryScope?.displayLabel.orEmpty(),
+                        readPreviewLines = buildList {
+                            event.explicitReadRequest?.queryText?.takeIf { it.isNotBlank() }?.let { query ->
+                                add(appStrings.get(R.string.tool_preview_field_query, query))
+                            }
+                            event.explicitReadRequest?.queryScope?.displayLabel?.takeIf { it.isNotBlank() }?.let { scope ->
+                                add(appStrings.get(R.string.tool_preview_field_scope, scope))
+                            }
+                        },
+                        supportingText = event.outcome.explanation,
+                    ),
+                )
+            }
+
             is RuntimeSessionEvent.CapabilityRouted -> {
                 _uiState.value = _uiState.value.copy(
                     runtimeStatus = _uiState.value.runtimeStatus.copy(
@@ -1600,7 +1629,27 @@ class AgentWorkspaceViewModel @Inject constructor(
 
             is RuntimeSessionEvent.CapabilityRequested -> Unit
 
-            is RuntimeSessionEvent.CapabilityCompleted -> Unit
+            is RuntimeSessionEvent.CapabilityCompleted -> {
+                event.readResult?.let { readResult ->
+                    _uiState.value = _uiState.value.copy(
+                        runtimeStatus = _uiState.value.runtimeStatus.copy(
+                            readOutcomeLabel = readOutcomeLabel(readResult.outcomeKind),
+                            readOutcomeLines = buildList {
+                                addAll(readResult.recordSummaries.map { summary ->
+                                    listOf(summary.title, summary.supportingText)
+                                        .filter { it.isNotBlank() }
+                                        .joinToString(separator = " · ")
+                                })
+                                readResult.recoveryMessage.takeIf { it.isNotBlank() }?.let(::add)
+                            }.take(4),
+                            supportingText = readResult.userMessage,
+                            toolVisibilityReason = readResult.recoveryMessage.ifBlank {
+                                _uiState.value.runtimeStatus.toolVisibilityReason
+                            },
+                        ),
+                    )
+                }
+            }
         }
     }
 
@@ -1609,6 +1658,54 @@ class AgentWorkspaceViewModel @Inject constructor(
             RuntimeSourceTrustState.TRUSTED -> appStrings.get(R.string.external_handoff_trust_trusted)
             RuntimeSourceTrustState.UNVERIFIED -> appStrings.get(R.string.external_handoff_trust_unverified)
             RuntimeSourceTrustState.DENIED -> appStrings.get(R.string.external_handoff_trust_denied)
+        }
+    }
+
+    private fun selectionModeLabel(
+        mode: com.mobileclaw.app.runtime.session.CapabilityResolutionMode,
+    ): String {
+        return when (mode) {
+            com.mobileclaw.app.runtime.session.CapabilityResolutionMode.REPLY_FALLBACK -> {
+                appStrings.get(R.string.workspace_selection_mode_reply)
+            }
+
+            com.mobileclaw.app.runtime.session.CapabilityResolutionMode.EXPLICIT_READ -> {
+                appStrings.get(R.string.workspace_selection_mode_read)
+            }
+
+            com.mobileclaw.app.runtime.session.CapabilityResolutionMode.EXPLICIT_ACTION -> {
+                appStrings.get(R.string.workspace_selection_mode_action)
+            }
+
+            com.mobileclaw.app.runtime.session.CapabilityResolutionMode.UNAVAILABLE -> {
+                appStrings.get(R.string.workspace_selection_mode_unavailable)
+            }
+
+            com.mobileclaw.app.runtime.session.CapabilityResolutionMode.CLARIFICATION_NEEDED -> {
+                appStrings.get(R.string.workspace_selection_mode_clarify)
+            }
+        }
+    }
+
+    private fun readOutcomeLabel(
+        outcome: com.mobileclaw.app.runtime.provider.ReadToolOutcomeKind,
+    ): String {
+        return when (outcome) {
+            com.mobileclaw.app.runtime.provider.ReadToolOutcomeKind.MATCHED -> {
+                appStrings.get(R.string.read_outcome_matched)
+            }
+
+            com.mobileclaw.app.runtime.provider.ReadToolOutcomeKind.NO_RESULTS -> {
+                appStrings.get(R.string.read_outcome_no_results)
+            }
+
+            com.mobileclaw.app.runtime.provider.ReadToolOutcomeKind.UNAVAILABLE -> {
+                appStrings.get(R.string.read_outcome_unavailable)
+            }
+
+            com.mobileclaw.app.runtime.provider.ReadToolOutcomeKind.FAILED -> {
+                appStrings.get(R.string.read_outcome_failed)
+            }
         }
     }
 
@@ -2503,15 +2600,19 @@ class AgentWorkspaceViewModel @Inject constructor(
             else -> WorkspaceAttentionMode.NORMAL
         }
         val primarySignals = buildList {
+            decoratedState.runtimeStatus.selectionModeLabel.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.selectionReason.takeIf { it.isNotBlank() }?.let(::add)
             decoratedState.runtimeStatus.sourceLabel.takeIf { it.isNotBlank() }?.let(::add)
             decoratedState.runtimeStatus.trustStateLabel.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.readOutcomeLabel.takeIf { it.isNotBlank() }?.let(::add)
             decoratedState.runtimeStatus.routeSummary.takeIf { it.isNotBlank() }?.let(::add)
-            decoratedState.runtimeStatus.structuredActionTitle.takeIf { it.isNotBlank() }?.let(::add)
             decoratedState.runtimeStatus.knowledgeSupportLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
             decoratedState.runtimeStatus.contributionSummaryLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
             decoratedState.automationArea.activeRunBanner?.statusLine?.takeIf { it.isNotBlank() }?.let(::add)
         }.take(4)
         val secondarySignals = buildList {
+            decoratedState.runtimeStatus.readScopeLabel.takeIf { it.isNotBlank() }?.let(::add)
+            decoratedState.runtimeStatus.readOutcomeLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
             decoratedState.runtimeStatus.systemSourceContributionLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
             decoratedState.runtimeStatus.systemSourceStatusLines.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
             decoratedState.runtimeStatus.knowledgeLimitationSummary.takeIf { it.isNotBlank() }?.let(::add)
@@ -2659,6 +2760,12 @@ class AgentWorkspaceViewModel @Inject constructor(
         state: AgentWorkspaceUiState,
         attentionMode: WorkspaceAttentionMode,
     ): List<RuntimeTraceSectionUiModel> {
+        val selectionLines = buildList {
+            state.runtimeStatus.selectionModeLabel.takeIf { it.isNotBlank() }?.let(::add)
+            state.runtimeStatus.selectionReason.takeIf { it.isNotBlank() }?.let(::add)
+            addAll(state.runtimeStatus.selectionWarnings.filter { it.isNotBlank() }.take(2))
+            addAll(state.runtimeStatus.selectionCandidateLines.filter { it.isNotBlank() }.take(3))
+        }.distinct()
         val sourceLines = listOfNotNull(
             state.runtimeStatus.sourceLabel.takeIf { it.isNotBlank() },
             state.runtimeStatus.trustStateLabel.takeIf { it.isNotBlank() },
@@ -2670,6 +2777,10 @@ class AgentWorkspaceViewModel @Inject constructor(
             state.runtimeStatus.toolSideEffectLabel.takeIf { it.isNotBlank() }?.let(::add)
             addAll(state.runtimeStatus.toolScopeLines.filter { it.isNotBlank() })
             state.runtimeStatus.routeSummary.takeIf { it.isNotBlank() }?.let(::add)
+            state.runtimeStatus.readScopeLabel.takeIf { it.isNotBlank() }?.let(::add)
+            addAll(state.runtimeStatus.readPreviewLines.filter { it.isNotBlank() }.take(2))
+            state.runtimeStatus.readOutcomeLabel.takeIf { it.isNotBlank() }?.let(::add)
+            addAll(state.runtimeStatus.readOutcomeLines.filter { it.isNotBlank() }.take(3))
             state.runtimeStatus.structuredActionTitle.takeIf { it.isNotBlank() }?.let { title ->
                 val completeness = state.runtimeStatus.structuredCompleteness
                 add(
@@ -2755,6 +2866,13 @@ class AgentWorkspaceViewModel @Inject constructor(
             )
         }
         return listOf(
+            RuntimeTraceSectionUiModel(
+                sectionId = "selection",
+                title = appStrings.get(R.string.runtime_control_section_selection),
+                lines = selectionLines,
+                emptyState = appStrings.get(R.string.runtime_control_empty_selection),
+                isHighlighted = state.runtimeStatus.selectionModeLabel.isNotBlank(),
+            ),
             RuntimeTraceSectionUiModel(
                 sectionId = "source",
                 title = appStrings.get(R.string.runtime_control_section_source),

@@ -28,6 +28,15 @@ class PolicyEngine @Inject constructor(
                 appStrings.get(R.string.policy_decision_preview_unknown),
             )
 
+            scope == ActionScope.CALENDAR_READ || scope == ActionScope.ALARM_SHOW -> Triple(
+                PolicyDecisionType.AUTO_EXECUTE,
+                PolicyRuleSource.CLASSIFIER,
+                appStrings.get(
+                    R.string.policy_decision_auto_execute_read,
+                    appStrings.actionScopeLabel(scope),
+                ),
+            )
+
             scope.riskMode == ActionRiskMode.HARD_CONFIRM -> Triple(
                 PolicyDecisionType.REQUIRE_CONFIRMATION,
                 PolicyRuleSource.HARD_CONFIRM_RULE,

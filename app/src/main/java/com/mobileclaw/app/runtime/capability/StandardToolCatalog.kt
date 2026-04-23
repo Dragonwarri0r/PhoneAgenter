@@ -17,6 +17,8 @@ class StandardToolCatalog @Inject constructor(
                 displayNameRes = R.string.tool_generate_reply_name,
                 descriptionRes = R.string.tool_generate_reply_description,
                 sideEffectType = ToolSideEffectType.READ,
+                invocationKind = ToolInvocationKind.REPLY,
+                freeformSelectionPolicy = FreeformSelectionPolicy.FALLBACK_TO_REPLY,
                 riskLevelHint = "low",
                 requiredScopes = listOf("reply.generate"),
                 confirmationPolicy = ConfirmationPolicy.NONE,
@@ -35,6 +37,7 @@ class StandardToolCatalog @Inject constructor(
                     previewFields = listOf("input"),
                     supportsPartial = false,
                 ),
+                selectionExamples = listOf("help me draft a reply", "summarize this"),
             )
 
             "calendar.read" -> descriptor(
@@ -43,14 +46,17 @@ class StandardToolCatalog @Inject constructor(
                 displayNameRes = R.string.tool_calendar_read_name,
                 descriptionRes = R.string.tool_calendar_read_description,
                 sideEffectType = ToolSideEffectType.READ,
+                invocationKind = ToolInvocationKind.EXPLICIT_READ,
+                freeformSelectionPolicy = FreeformSelectionPolicy.SAFE_AUTO,
                 riskLevelHint = "low",
                 requiredScopes = listOf("calendar.read"),
-                confirmationPolicy = ConfirmationPolicy.PREVIEW_FIRST,
+                confirmationPolicy = ConfirmationPolicy.NONE,
                 bindings = listOf(
                     ToolBindingDescriptor(
                         bindingId = "system.calendar.provider.read",
-                        bindingType = ProviderType.LOCAL,
+                        bindingType = ProviderType.CONTENT_RESOLVER,
                         androidContract = "calendar_provider_read",
+                        primary = true,
                     ),
                 ),
                 inputSchema = ToolSchemaDescriptor(
@@ -58,6 +64,35 @@ class StandardToolCatalog @Inject constructor(
                     schemaJson = """{"type":"object","properties":{"query":{"type":"string"}}}""",
                     previewFields = listOf("query"),
                 ),
+                defaultResultLimit = 5,
+                selectionExamples = listOf("what's on my calendar today", "show my schedule this afternoon"),
+            )
+
+            "contacts.read" -> descriptor(
+                toolId = "contacts.read",
+                capabilityId = capabilityId,
+                displayNameRes = R.string.tool_contacts_read_name,
+                descriptionRes = R.string.tool_contacts_read_description,
+                sideEffectType = ToolSideEffectType.READ,
+                invocationKind = ToolInvocationKind.EXPLICIT_READ,
+                freeformSelectionPolicy = FreeformSelectionPolicy.SAFE_AUTO,
+                riskLevelHint = "low",
+                requiredScopes = listOf("contacts.read"),
+                confirmationPolicy = ConfirmationPolicy.NONE,
+                bindings = listOf(
+                    ToolBindingDescriptor(
+                        bindingId = "system.contacts.provider.read",
+                        bindingType = ProviderType.CONTENT_RESOLVER,
+                        androidContract = "contacts_provider_read",
+                        primary = true,
+                    ),
+                ),
+                inputSchema = ToolSchemaDescriptor(
+                    schemaId = "tool.contacts.read.input",
+                    schemaJson = """{"type":"object","properties":{"query":{"type":"string"}}}""",
+                    previewFields = listOf("query"),
+                ),
+                defaultResultLimit = 3,
             )
 
             "calendar.write" -> descriptor(
@@ -66,15 +101,22 @@ class StandardToolCatalog @Inject constructor(
                 displayNameRes = R.string.tool_calendar_write_name,
                 descriptionRes = R.string.tool_calendar_write_description,
                 sideEffectType = ToolSideEffectType.WRITE,
+                invocationKind = ToolInvocationKind.SIDE_EFFECT,
+                freeformSelectionPolicy = FreeformSelectionPolicy.POLICY_GATED,
                 riskLevelHint = "high",
                 requiredScopes = listOf("calendar.write"),
                 confirmationPolicy = ConfirmationPolicy.REQUIRE_CONFIRMATION,
                 bindings = listOf(
                     ToolBindingDescriptor(
+                        bindingId = "system.calendar.provider.write",
+                        bindingType = ProviderType.CONTENT_RESOLVER,
+                        androidContract = "calendar_provider_write",
+                        primary = true,
+                    ),
+                    ToolBindingDescriptor(
                         bindingId = "intent.calendar.write",
                         bindingType = ProviderType.INTENT,
                         androidContract = "Intent.ACTION_INSERT(CalendarContract.Events)",
-                        primary = true,
                     ),
                 ),
                 inputSchema = ToolSchemaDescriptor(
@@ -85,12 +127,42 @@ class StandardToolCatalog @Inject constructor(
                 ),
             )
 
+            "calendar.delete" -> descriptor(
+                toolId = "calendar.delete",
+                capabilityId = capabilityId,
+                displayNameRes = R.string.tool_calendar_delete_name,
+                descriptionRes = R.string.tool_calendar_delete_description,
+                sideEffectType = ToolSideEffectType.WRITE,
+                invocationKind = ToolInvocationKind.SIDE_EFFECT,
+                freeformSelectionPolicy = FreeformSelectionPolicy.POLICY_GATED,
+                riskLevelHint = "high",
+                requiredScopes = listOf("calendar.delete"),
+                confirmationPolicy = ConfirmationPolicy.REQUIRE_CONFIRMATION,
+                bindings = listOf(
+                    ToolBindingDescriptor(
+                        bindingId = "system.calendar.provider.delete",
+                        bindingType = ProviderType.CONTENT_RESOLVER,
+                        androidContract = "calendar_provider_delete",
+                        primary = true,
+                    ),
+                ),
+                inputSchema = ToolSchemaDescriptor(
+                    schemaId = "tool.calendar.delete.input",
+                    schemaJson = """{"type":"object","properties":{"title":{"type":"string"},"time":{"type":"string"}}}""",
+                    requiredFields = listOf("title"),
+                    previewFields = listOf("title", "time"),
+                ),
+                selectionExamples = listOf("delete my lunch with Bob tomorrow", "删除明天下午和 Bob 的会议"),
+            )
+
             "alarm.set" -> descriptor(
                 toolId = "alarm.set",
                 capabilityId = capabilityId,
                 displayNameRes = R.string.tool_alarm_set_name,
                 descriptionRes = R.string.tool_alarm_set_description,
                 sideEffectType = ToolSideEffectType.WRITE,
+                invocationKind = ToolInvocationKind.SIDE_EFFECT,
+                freeformSelectionPolicy = FreeformSelectionPolicy.POLICY_GATED,
                 riskLevelHint = "high",
                 requiredScopes = listOf("alarm.set"),
                 confirmationPolicy = ConfirmationPolicy.REQUIRE_CONFIRMATION,
@@ -116,9 +188,11 @@ class StandardToolCatalog @Inject constructor(
                 displayNameRes = R.string.tool_alarm_show_name,
                 descriptionRes = R.string.tool_alarm_show_description,
                 sideEffectType = ToolSideEffectType.READ,
+                invocationKind = ToolInvocationKind.EXPLICIT_READ,
+                freeformSelectionPolicy = FreeformSelectionPolicy.SAFE_AUTO,
                 riskLevelHint = "low",
                 requiredScopes = listOf("alarm.show"),
-                confirmationPolicy = ConfirmationPolicy.PREVIEW_FIRST,
+                confirmationPolicy = ConfirmationPolicy.NONE,
                 bindings = listOf(
                     ToolBindingDescriptor(
                         bindingId = "intent.alarm.show",
@@ -140,6 +214,8 @@ class StandardToolCatalog @Inject constructor(
                 displayNameRes = R.string.tool_alarm_dismiss_name,
                 descriptionRes = R.string.tool_alarm_dismiss_description,
                 sideEffectType = ToolSideEffectType.WRITE,
+                invocationKind = ToolInvocationKind.SIDE_EFFECT,
+                freeformSelectionPolicy = FreeformSelectionPolicy.POLICY_GATED,
                 riskLevelHint = "high",
                 requiredScopes = listOf("alarm.dismiss"),
                 confirmationPolicy = ConfirmationPolicy.REQUIRE_CONFIRMATION,
@@ -164,6 +240,8 @@ class StandardToolCatalog @Inject constructor(
                 displayNameRes = R.string.tool_message_send_name,
                 descriptionRes = R.string.tool_message_send_description,
                 sideEffectType = ToolSideEffectType.DISPATCH,
+                invocationKind = ToolInvocationKind.SIDE_EFFECT,
+                freeformSelectionPolicy = FreeformSelectionPolicy.POLICY_GATED,
                 riskLevelHint = "high",
                 requiredScopes = listOf("message.send"),
                 confirmationPolicy = ConfirmationPolicy.REQUIRE_CONFIRMATION,
@@ -189,6 +267,8 @@ class StandardToolCatalog @Inject constructor(
                 displayNameRes = R.string.tool_share_outbound_name,
                 descriptionRes = R.string.tool_share_outbound_description,
                 sideEffectType = ToolSideEffectType.DISPATCH,
+                invocationKind = ToolInvocationKind.SIDE_EFFECT,
+                freeformSelectionPolicy = FreeformSelectionPolicy.POLICY_GATED,
                 riskLevelHint = "high",
                 requiredScopes = listOf("external.share"),
                 confirmationPolicy = ConfirmationPolicy.REQUIRE_CONFIRMATION,
@@ -214,6 +294,8 @@ class StandardToolCatalog @Inject constructor(
                 displayNameRes = R.string.tool_generic_name,
                 descriptionRes = R.string.tool_generic_description,
                 sideEffectType = ToolSideEffectType.WRITE,
+                invocationKind = ToolInvocationKind.SIDE_EFFECT,
+                freeformSelectionPolicy = FreeformSelectionPolicy.POLICY_GATED,
                 riskLevelHint = "unknown",
                 requiredScopes = emptyList(),
                 confirmationPolicy = ConfirmationPolicy.PREVIEW_FIRST,
@@ -232,11 +314,15 @@ class StandardToolCatalog @Inject constructor(
         displayNameRes: Int,
         descriptionRes: Int,
         sideEffectType: ToolSideEffectType,
+        invocationKind: ToolInvocationKind,
+        freeformSelectionPolicy: FreeformSelectionPolicy,
         riskLevelHint: String,
         requiredScopes: List<String>,
         confirmationPolicy: ConfirmationPolicy,
         bindings: List<ToolBindingDescriptor>,
         inputSchema: ToolSchemaDescriptor,
+        defaultResultLimit: Int = 0,
+        selectionExamples: List<String> = emptyList(),
     ): ToolDescriptor {
         return ToolDescriptor(
             toolId = toolId,
@@ -245,10 +331,14 @@ class StandardToolCatalog @Inject constructor(
             description = appStrings.get(descriptionRes),
             inputSchema = inputSchema,
             sideEffectType = sideEffectType,
+            invocationKind = invocationKind,
+            freeformSelectionPolicy = freeformSelectionPolicy,
             riskLevelHint = riskLevelHint,
             requiredScopes = requiredScopes,
             confirmationPolicy = confirmationPolicy,
             bindingDescriptors = bindings,
+            defaultResultLimit = defaultResultLimit,
+            selectionExamples = selectionExamples,
         )
     }
 }

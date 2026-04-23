@@ -13,6 +13,8 @@ import com.mobileclaw.app.runtime.policy.ApprovalRequest
 import com.mobileclaw.app.runtime.policy.AuditEvent
 import com.mobileclaw.app.runtime.policy.PolicyDecision
 import com.mobileclaw.app.runtime.policy.RiskAssessment
+import com.mobileclaw.app.runtime.provider.ExplicitReadToolRequest
+import com.mobileclaw.app.runtime.provider.ReadToolResult
 import com.mobileclaw.app.runtime.systemsource.SystemSourceContribution
 import com.mobileclaw.app.runtime.systemsource.SystemSourceDescriptor
 
@@ -73,6 +75,12 @@ sealed interface RuntimeSessionEvent {
 
     data class CallerVerified(
         val callerIdentity: CallerIdentity,
+    ) : RuntimeSessionEvent
+
+    data class CapabilitySelectionResolved(
+        val sessionId: String,
+        val outcome: CapabilitySelectionOutcome,
+        val explicitReadRequest: ExplicitReadToolRequest? = null,
     ) : RuntimeSessionEvent
 
     data class CapabilityRouted(
@@ -137,6 +145,7 @@ sealed interface RuntimeSessionEvent {
         val capabilityId: String,
         val providerId: String,
         val outputText: String,
+        val readResult: ReadToolResult? = null,
     ) : RuntimeSessionEvent
 
     data class CapabilityFailed(

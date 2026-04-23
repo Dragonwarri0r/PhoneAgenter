@@ -21,6 +21,7 @@ import com.mobileclaw.app.runtime.policy.PolicyEngine
 import com.mobileclaw.app.runtime.policy.PolicyRepository
 import com.mobileclaw.app.runtime.policy.RiskClassifier
 import com.mobileclaw.app.runtime.provider.CapabilityExecutionRequest
+import com.mobileclaw.app.runtime.provider.ReadToolRequestBuilder
 import com.mobileclaw.app.runtime.provider.CapabilityProviderRegistry
 import com.mobileclaw.app.runtime.capability.ProviderType
 import com.mobileclaw.app.runtime.provider.ProviderExecutionEvent
@@ -44,6 +45,7 @@ class RuntimeSessionOrchestrator @Inject constructor(
     private val contextLoader: RuntimeContextLoader,
     private val planner: RuntimePlanner,
     private val structuredActionNormalizer: StructuredActionNormalizer,
+    private val readToolRequestBuilder: ReadToolRequestBuilder,
     private val riskClassifier: RiskClassifier,
     private val policyEngine: PolicyEngine,
     private val policyRepository: PolicyRepository,
@@ -129,15 +131,33 @@ class RuntimeSessionOrchestrator @Inject constructor(
                 plan = basePlan,
                 contextPayload = contextPayload,
             )
-            val plan = basePlan.copy(structuredAction = normalization.takeIf { it.applies })
+            val explicitReadRequest = readToolRequestBuilder.build(
+                request = request,
+                plan = basePlan,
+                contextPayload = contextPayload,
+            )
+            val plan = basePlan.copy(
+                structuredAction = normalization.takeIf { it.applies },
+                explicitReadRequest = explicitReadRequest,
+            )
 
             val selectingSession = registry.advanceStage(
                 sessionId = session.sessionId,
                 stageType = RuntimeStageType.CAPABILITY_SELECTION,
-                details = normalization.preview?.summary
+                details = plan.selectionOutcome?.explanation
+                    ?: normalization.preview?.summary
                     ?: appStrings.get(R.string.runtime_selected_capability, plan.selectedCapabilityId),
             ) ?: return@flow
             emitStage(selectingSession, emit = ::emit)
+            plan.selectionOutcome?.let { outcome ->
+                emit(
+                    RuntimeSessionEvent.CapabilitySelectionResolved(
+                        sessionId = session.sessionId,
+                        outcome = outcome,
+                        explicitReadRequest = plan.explicitReadRequest,
+                    ),
+                )
+            }
             if (normalization.applies) {
                 emit(
                     RuntimeSessionEvent.StructuredActionPrepared(
@@ -366,6 +386,7 @@ class RuntimeSessionOrchestrator @Inject constructor(
                         toolDescriptor = selectedToolDescriptor ?: routeResult.registration!!.toolDescriptor,
                         visibilitySnapshot = selectedToolVisibility,
                         normalization = normalization.takeIf { it.applies },
+                        explicitReadRequest = plan.explicitReadRequest,
                     )
                     activeApprovalRequest = approvalRequest
                     emit(RuntimeSessionEvent.ApprovalRequested(approvalRequest))
@@ -546,6 +567,7 @@ class RuntimeSessionOrchestrator @Inject constructor(
                                 capabilityId = providerEvent.capabilityId,
                                 providerId = routedDescriptor.providerId,
                                 outputText = providerEvent.outputText,
+                                readResult = providerEvent.readResult,
                             ),
                         )
                         val completed = registry.finishSession(
@@ -563,7 +585,8 @@ class RuntimeSessionOrchestrator @Inject constructor(
                             RuntimeSessionEvent.AuditRecorded(
                                 auditRepository.recordExecutionCompleted(
                                     sessionId = session.sessionId,
-                                    details = appStrings.get(R.string.runtime_request_completed),
+                                    details = providerEvent.readResult?.auditSummary
+                                        ?: appStrings.get(R.string.runtime_request_completed),
                                     toolId = selectedToolDescriptor?.toolId,
                                     toolDisplayName = selectedToolDescriptor?.displayName,
                                     sideEffectLabel = selectedToolDescriptor?.sideEffectType?.let(appStrings::toolSideEffectLabel),

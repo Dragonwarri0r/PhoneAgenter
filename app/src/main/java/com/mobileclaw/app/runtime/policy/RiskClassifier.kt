@@ -3,6 +3,7 @@ package com.mobileclaw.app.runtime.policy
 import com.mobileclaw.app.R
 import com.mobileclaw.app.runtime.action.PayloadCompletenessState
 import com.mobileclaw.app.runtime.intent.RuntimeIntentHeuristics
+import com.mobileclaw.app.runtime.session.CapabilityResolutionMode
 import com.mobileclaw.app.runtime.session.RuntimePlan
 import com.mobileclaw.app.runtime.session.RuntimeRequest
 import com.mobileclaw.app.runtime.strings.AppStrings
@@ -19,13 +20,17 @@ class RiskClassifier @Inject constructor(
         plan: RuntimePlan,
     ): RiskAssessment {
         val inferredIntent = RuntimeIntentHeuristics.infer(request.userInput)
+        val selectedOutcome = plan.selectionOutcome
         val isWorkspaceFreeformChat = request.originApp == "agent_workspace" &&
             request.sourceMetadata == null &&
             request.requestedCapabilities.isEmpty()
         val scope = when {
             inferredIntent.containsBlockedOperation -> ActionScope.BLOCKED_OPERATION
-            isWorkspaceFreeformChat && plan.selectedCapabilityId == "generate.reply" -> {
+            selectedOutcome?.resolutionMode == CapabilityResolutionMode.REPLY_FALLBACK -> {
                 ActionScope.REPLY_GENERATE
+            }
+            ActionScope.fromSelectionOutcome(selectedOutcome) != null -> {
+                ActionScope.fromSelectionOutcome(selectedOutcome)!!
             }
             else -> ActionScope.infer(
                 userInput = request.userInput,
@@ -37,6 +42,10 @@ class RiskClassifier @Inject constructor(
             add("capability:${plan.selectedCapabilityId}")
             addAll(inferredIntent.matchedSignals)
             if (isWorkspaceFreeformChat) add("mode:workspace_freeform_chat")
+            selectedOutcome?.let { outcome ->
+                add("selection_mode:${outcome.resolutionMode.name.lowercase()}")
+                add("selection_source:${outcome.selectionSource.name.lowercase()}")
+            }
             plan.structuredAction?.payload?.let { payload ->
                 add("structured:${payload.actionType.capabilityId}")
                 add("structured_completeness:${payload.completenessState.name.lowercase()}")
@@ -49,6 +58,7 @@ class RiskClassifier @Inject constructor(
         val completeness = plan.structuredAction?.payload?.completenessState
         val riskLevel = when {
             inferredIntent.containsBlockedOperation || scope.riskMode == ActionRiskMode.BLOCKED -> RiskLevel.BLOCKED
+            selectedOutcome?.resolutionMode == CapabilityResolutionMode.REPLY_FALLBACK -> RiskLevel.LOW
             completeness == PayloadCompletenessState.INSUFFICIENT -> RiskLevel.HIGH
             scope == ActionScope.EXTERNAL_SHARE ||
                 scope == ActionScope.ALARM_SET ||
@@ -93,7 +103,8 @@ class RiskClassifier @Inject constructor(
             rationale = rationale,
             signals = signals,
             confidence = when (riskLevel) {
-                RiskLevel.LOW -> inferredIntent.confidence.coerceAtLeast(0.6)
+                RiskLevel.LOW -> selectedOutcome?.confidence?.coerceAtLeast(0.6)
+                    ?: inferredIntent.confidence.coerceAtLeast(0.6)
                 RiskLevel.MEDIUM -> (inferredIntent.confidence + 0.06).coerceAtMost(0.88)
                 RiskLevel.HIGH -> (inferredIntent.confidence + 0.1).coerceAtMost(0.93)
                 RiskLevel.BLOCKED -> (inferredIntent.confidence + 0.05).coerceAtMost(0.99)

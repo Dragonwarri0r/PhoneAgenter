@@ -48,6 +48,7 @@ class LocalGenerationProvider @Inject constructor(
         val generationPrompt = promptComposer.compose(
             request = request.request,
             contextPayload = request.contextPayload,
+            selectionOutcome = request.selectionOutcome,
         )
         try {
             localChatGateway.streamAssistantTurn(

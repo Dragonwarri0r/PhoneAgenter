@@ -37,7 +37,7 @@ private enum class ControlCenterPage(
     val titleRes: Int,
 ) {
     OVERVIEW(
-        sectionIds = setOf("source", "tool", "approval", "constraints", "recent_activity"),
+        sectionIds = setOf("selection", "source", "tool", "approval", "constraints", "recent_activity"),
         titleRes = R.string.runtime_control_tab_overview,
     ),
     CONTEXT(

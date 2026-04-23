@@ -143,15 +143,6 @@ fun WorkspaceHeader(
                     }
                 }
             }
-            if (panelsExpanded) {
-                Text(
-                    text = sessionId ?: stringResource(R.string.workspace_no_active_session),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
         }
     }
 }

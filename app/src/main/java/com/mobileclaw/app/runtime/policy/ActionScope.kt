@@ -1,6 +1,8 @@
 package com.mobileclaw.app.runtime.policy
 
 import com.mobileclaw.app.runtime.intent.RuntimeIntentHeuristics
+import com.mobileclaw.app.runtime.session.CapabilityResolutionMode
+import com.mobileclaw.app.runtime.session.CapabilitySelectionOutcome
 
 enum class ActionRiskMode {
     AUTO_ALLOWED,
@@ -26,6 +28,10 @@ enum class ActionScope(
     ),
     CALENDAR_WRITE(
         scopeId = "calendar.write",
+        riskMode = ActionRiskMode.HARD_CONFIRM,
+    ),
+    CALENDAR_DELETE(
+        scopeId = "calendar.delete",
         riskMode = ActionRiskMode.HARD_CONFIRM,
     ),
     ALARM_SET(
@@ -73,6 +79,7 @@ enum class ActionScope(
                 "calendar.read" -> CALENDAR_READ
                 "message.send" -> MESSAGE_SEND
                 "calendar.write" -> CALENDAR_WRITE
+                "calendar.delete" -> CALENDAR_DELETE
                 "alarm.set" -> ALARM_SET
                 "alarm.show" -> ALARM_SHOW
                 "alarm.dismiss" -> ALARM_DISMISS
@@ -95,6 +102,17 @@ enum class ActionScope(
                 capabilityScope == UNKNOWN -> inferred.scope
                 capabilityScope == REPLY_GENERATE && inferred.scope != REPLY_GENERATE -> inferred.scope
                 else -> capabilityScope
+            }
+        }
+
+        fun fromSelectionOutcome(outcome: CapabilitySelectionOutcome?): ActionScope? {
+            return when (outcome?.resolutionMode) {
+                CapabilityResolutionMode.REPLY_FALLBACK -> REPLY_GENERATE
+                CapabilityResolutionMode.EXPLICIT_READ,
+                CapabilityResolutionMode.EXPLICIT_ACTION,
+                -> fromCapabilityId(outcome.selectedCapabilityId)
+
+                else -> null
             }
         }
     }

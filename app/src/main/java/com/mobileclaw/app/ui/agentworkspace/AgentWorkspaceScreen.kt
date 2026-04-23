@@ -238,6 +238,7 @@ fun AgentWorkspaceScreen(
                                 arrayOf(
                                     android.Manifest.permission.READ_CONTACTS,
                                     android.Manifest.permission.READ_CALENDAR,
+                                    android.Manifest.permission.WRITE_CALENDAR,
                                 ),
                             )
                         },
@@ -414,6 +415,7 @@ fun AgentWorkspaceScreen(
                                 arrayOf(
                                     android.Manifest.permission.READ_CONTACTS,
                                     android.Manifest.permission.READ_CALENDAR,
+                                    android.Manifest.permission.WRITE_CALENDAR,
                                 ),
                             )
                         }

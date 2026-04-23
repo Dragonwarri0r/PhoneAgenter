@@ -2,6 +2,7 @@ package com.mobileclaw.app.runtime.contribution
 
 import com.mobileclaw.app.R
 import com.mobileclaw.app.runtime.extension.ExtensionEnablementState
+import com.mobileclaw.app.runtime.extension.RuntimeProviderSurface
 import com.mobileclaw.app.runtime.extension.ExtensionTrustRequirement
 import com.mobileclaw.app.runtime.extension.RuntimeExtensionRegistry
 import com.mobileclaw.app.runtime.extension.RuntimeExtensionType
@@ -198,7 +199,7 @@ class RuntimeContributionRegistry @Inject constructor(
             eligibilityProfile = ContributionEligibilityProfile(
                 requiredTrustState = appStrings.extensionTrustRequirementLabel(registration.trustRequirement),
                 requiredScopes = listOf(extensionScopeSummary(registration)),
-                requiredDependencies = registration.requiredRuntimeMetadata,
+                requiredDependencies = registration.requiredRuntimeMetadata + registration.requiredPermissions,
                 privacyNotes = appStrings.extensionPrivacyGuaranteeLabel(registration.privacyGuarantee),
                 policyNotes = extensionPolicySummary(registration),
             ),
@@ -215,10 +216,22 @@ class RuntimeContributionRegistry @Inject constructor(
         return when (registration.extensionId) {
             "context.contacts.system" -> appStrings.get(R.string.runtime_contribution_scope_contacts_context)
             "context.calendar.system" -> appStrings.get(R.string.runtime_contribution_scope_calendar_context)
-            else -> appStrings.get(
-                R.string.runtime_contribution_scope_capabilities,
-                registration.contributedCapabilities.joinToString(separator = ", "),
-            )
+            else -> when (registration.providerSurface) {
+                RuntimeProviderSurface.EXPLICIT_READ -> appStrings.get(
+                    R.string.runtime_contribution_scope_read_capabilities,
+                    registration.contributedCapabilities.joinToString(separator = ", "),
+                )
+
+                RuntimeProviderSurface.EXPLICIT_MUTATION -> appStrings.get(
+                    R.string.runtime_contribution_scope_mutation_capabilities,
+                    registration.contributedCapabilities.joinToString(separator = ", "),
+                )
+
+                RuntimeProviderSurface.GENERIC_TOOL -> appStrings.get(
+                    R.string.runtime_contribution_scope_capabilities,
+                    registration.contributedCapabilities.joinToString(separator = ", "),
+                )
+            }
         }
     }
 
@@ -228,6 +241,14 @@ class RuntimeContributionRegistry @Inject constructor(
         return when (registration.trustRequirement) {
             ExtensionTrustRequirement.PRIVILEGED_CONTEXT ->
                 appStrings.get(R.string.runtime_contribution_permission_required)
+            ExtensionTrustRequirement.NONE -> when (registration.providerSurface) {
+                RuntimeProviderSurface.EXPLICIT_READ -> appStrings.get(R.string.runtime_contribution_read_provider_note)
+                RuntimeProviderSurface.EXPLICIT_MUTATION -> {
+                    appStrings.get(R.string.runtime_contribution_mutation_provider_note)
+                }
+
+                RuntimeProviderSurface.GENERIC_TOOL -> ""
+            }
             else -> ""
         }
     }

@@ -26,6 +26,7 @@ class StructuredActionNormalizer @Inject constructor(
         return when (actionType) {
             StructuredActionType.MESSAGE_SEND -> normalizeMessage(request)
             StructuredActionType.CALENDAR_WRITE -> normalizeCalendar(request, contextPayload)
+            StructuredActionType.CALENDAR_DELETE -> normalizeCalendarDelete(request)
             StructuredActionType.EXTERNAL_SHARE -> normalizeShare(request)
         }
     }
@@ -100,17 +101,24 @@ class StructuredActionNormalizer @Inject constructor(
         contextPayload: RuntimeContextPayload,
     ): ActionNormalizationResult {
         val raw = request.userInput.trim()
-        val title = extractCalendarTitle(raw)
-        val timeHint = extractTimeHint(raw)
-        val description = raw.takeIf { it.isNotBlank() }.orEmpty()
+        val parsed = CalendarCapabilityParser.parseCreate(raw)
+        val title = parsed.title
+        val timeHint = parsed.timeLabel
+        val description = parsed.description
         val fields = buildMap {
             if (title.isNotBlank()) put("title", title)
             if (timeHint.isNotBlank()) put("timeHint", timeHint)
             if (description.isNotBlank()) put("description", description)
+            parsed.startEpochMillis?.let { put("startEpochMillis", it.toString()) }
+            parsed.endEpochMillis?.let { put("endEpochMillis", it.toString()) }
+            put("allDay", parsed.allDay.toString())
             if (contextPayload.personaSummary.isNotBlank()) put("personaSummary", contextPayload.personaSummary)
         }
         val completeness = when {
-            title.isNotBlank() && timeHint.isNotBlank() -> PayloadCompletenessState.COMPLETE
+            title.isNotBlank() && parsed.startEpochMillis != null && parsed.endEpochMillis != null -> {
+                PayloadCompletenessState.COMPLETE
+            }
+
             title.isNotBlank() || timeHint.isNotBlank() -> PayloadCompletenessState.PARTIAL
             else -> PayloadCompletenessState.INSUFFICIENT
         }
@@ -164,6 +172,73 @@ class StructuredActionNormalizer @Inject constructor(
                 completenessState = completeness,
             ),
             rationale = appStrings.get(R.string.structured_rationale_calendar),
+        )
+    }
+
+    private fun normalizeCalendarDelete(
+        request: RuntimeRequest,
+    ): ActionNormalizationResult {
+        val raw = request.userInput.trim()
+        val parsed = CalendarCapabilityParser.parseDelete(raw)
+        val title = parsed.title
+        val timeHint = parsed.windowLabel
+        val fields = buildMap {
+            if (title.isNotBlank()) put("title", title)
+            if (timeHint.isNotBlank()) put("timeHint", timeHint)
+            parsed.queryStartEpochMillis?.let { put("queryStartEpochMillis", it.toString()) }
+            parsed.queryEndEpochMillis?.let { put("queryEndEpochMillis", it.toString()) }
+        }
+        val completeness = when {
+            title.isNotBlank() &&
+                parsed.queryStartEpochMillis != null &&
+                parsed.queryEndEpochMillis != null -> PayloadCompletenessState.COMPLETE
+
+            title.isNotBlank() || timeHint.isNotBlank() -> PayloadCompletenessState.PARTIAL
+            else -> PayloadCompletenessState.INSUFFICIENT
+        }
+        val warnings = buildList {
+            if (title.isBlank()) add(appStrings.get(R.string.structured_warning_missing_target))
+            if (timeHint.isBlank()) add(appStrings.get(R.string.structured_warning_missing_time))
+        }
+        val payload = StructuredActionPayload(
+            actionType = StructuredActionType.CALENDAR_DELETE,
+            completenessState = completeness,
+            fields = fields,
+            evidence = listOfNotNull(
+                title.takeIf { it.isNotBlank() }?.let { PayloadFieldEvidence("title", it, 0.7) },
+                timeHint.takeIf { it.isNotBlank() }?.let { PayloadFieldEvidence("timeHint", it, 0.63) },
+            ),
+            warnings = warnings,
+        )
+        return ActionNormalizationResult(
+            applies = true,
+            payload = payload,
+            preview = StructuredExecutionPreview(
+                title = appStrings.structuredActionTypeLabel(StructuredActionType.CALENDAR_DELETE),
+                summary = appStrings.get(
+                    R.string.structured_summary_calendar_delete,
+                    title.ifBlank { appStrings.get(R.string.structured_field_unknown) },
+                ),
+                fieldLines = buildList {
+                    add(
+                        appStrings.get(
+                            R.string.structured_field_template,
+                            appStrings.get(R.string.structured_field_target),
+                            title.ifBlank { appStrings.get(R.string.structured_field_unknown) },
+                        ),
+                    )
+                    add(
+                        appStrings.get(
+                            R.string.structured_field_template,
+                            appStrings.get(R.string.structured_field_time),
+                            timeHint.ifBlank { appStrings.get(R.string.structured_field_unknown) },
+                        ),
+                    )
+                },
+                warnings = warnings,
+                completenessState = completeness,
+            ),
+            rationale = appStrings.get(R.string.structured_rationale_calendar_delete),
         )
     }
 
@@ -255,27 +330,6 @@ class StructuredActionNormalizer @Inject constructor(
             raw.substringAfter(separator, "").trim().takeIf { it.isNotBlank() && it != raw }
         }.orEmpty()
     }
-
-    private fun extractCalendarTitle(raw: String): String {
-        val patterns = listOf(
-            Regex("""(?:schedule|create|book|set up|reschedule)\s+(?:a |an )?(?:meeting|event)?\s*(.+?)?(?:\s+(?:at|on|for)\b|$)""", RegexOption.IGNORE_CASE),
-            Regex("""(?:安排|创建|添加)(.+?)(?:在|到|明天|今天|今晚|下周|$)"""),
-        )
-        return patterns.firstNotNullOfOrNull { pattern ->
-            pattern.find(raw)?.groupValues?.getOrNull(1)?.trim()
-        }.orEmpty().trim(',', '，', '。', ':', '：', ' ')
-    }
-
-    private fun extractTimeHint(raw: String): String {
-        val patterns = listOf(
-            Regex("""\b(today|tomorrow|tonight|next week|next monday|next tuesday|next wednesday|next thursday|next friday|next saturday|next sunday)\b(?:\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?""", RegexOption.IGNORE_CASE),
-            Regex("""\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b""", RegexOption.IGNORE_CASE),
-            Regex("""(?:今天|明天|今晚|下周[一二三四五六日天]?)(?:\s*[上下]午?\s*\d{1,2}[:：]?\d{0,2})?"""),
-            Regex("""[上下]午?\s*\d{1,2}[:：]?\d{0,2}"""),
-        )
-        return patterns.firstNotNullOfOrNull { it.find(raw)?.value?.trim() }.orEmpty()
-    }
-
     private fun extractDestinationHint(raw: String): String {
         val patterns = listOf(
             Regex("""(?:share|post|publish|tweet|send)\s+(?:this|it)?\s*(?:to|with|on)\s+([^\n:,.]+)""", RegexOption.IGNORE_CASE),

@@ -35,6 +35,7 @@ import com.mobileclaw.app.runtime.ingress.InteropEntryType
 import com.mobileclaw.app.runtime.ingress.UriGrantMode
 import com.mobileclaw.app.runtime.extension.ExtensionEnablementState
 import com.mobileclaw.app.runtime.extension.ExtensionPrivacyGuarantee
+import com.mobileclaw.app.runtime.extension.RuntimeProviderSurface
 import com.mobileclaw.app.runtime.extension.ExtensionTrustRequirement
 import com.mobileclaw.app.runtime.policy.ActionScope
 import com.mobileclaw.app.runtime.policy.ApprovalOutcomeType
@@ -214,6 +215,7 @@ class AppStrings @Inject constructor(
             ActionScope.CALENDAR_READ -> R.string.policy_scope_calendar_read
             ActionScope.MESSAGE_SEND -> R.string.policy_scope_message_send
             ActionScope.CALENDAR_WRITE -> R.string.policy_scope_calendar_write
+            ActionScope.CALENDAR_DELETE -> R.string.policy_scope_calendar_delete
             ActionScope.ALARM_SET -> R.string.policy_scope_alarm_set
             ActionScope.ALARM_SHOW -> R.string.policy_scope_alarm_show
             ActionScope.ALARM_DISMISS -> R.string.policy_scope_alarm_dismiss
@@ -256,10 +258,19 @@ class AppStrings @Inject constructor(
     fun providerTypeLabel(providerType: ProviderType): String = get(
         when (providerType) {
             ProviderType.LOCAL -> R.string.bridge_provider_local
+            ProviderType.CONTENT_RESOLVER -> R.string.bridge_provider_content_resolver
             ProviderType.APP_FUNCTIONS -> R.string.bridge_provider_appfunctions
             ProviderType.INTENT -> R.string.bridge_provider_intent
             ProviderType.SHARE -> R.string.bridge_provider_share
             ProviderType.ACCESSIBILITY -> R.string.bridge_provider_accessibility
+        },
+    )
+
+    fun extensionProviderSurfaceLabel(surface: RuntimeProviderSurface): String = get(
+        when (surface) {
+            RuntimeProviderSurface.GENERIC_TOOL -> R.string.extension_provider_surface_generic
+            RuntimeProviderSurface.EXPLICIT_READ -> R.string.extension_provider_surface_read
+            RuntimeProviderSurface.EXPLICIT_MUTATION -> R.string.extension_provider_surface_mutation
         },
     )
 
@@ -397,6 +408,7 @@ class AppStrings @Inject constructor(
         when (type) {
             StructuredActionType.MESSAGE_SEND -> R.string.structured_type_message_send
             StructuredActionType.CALENDAR_WRITE -> R.string.structured_type_calendar_write
+            StructuredActionType.CALENDAR_DELETE -> R.string.structured_type_calendar_delete
             StructuredActionType.EXTERNAL_SHARE -> R.string.structured_type_external_share
         },
     )

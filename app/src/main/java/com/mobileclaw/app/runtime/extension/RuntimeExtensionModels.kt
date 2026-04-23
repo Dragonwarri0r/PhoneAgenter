@@ -29,6 +29,12 @@ enum class ExtensionEnablementState {
     INCOMPATIBLE,
 }
 
+enum class RuntimeProviderSurface {
+    GENERIC_TOOL,
+    EXPLICIT_READ,
+    EXPLICIT_MUTATION,
+}
+
 data class RuntimeExtensionRegistration(
     val extensionId: String,
     val extensionType: RuntimeExtensionType,
@@ -39,6 +45,8 @@ data class RuntimeExtensionRegistration(
     val privacyGuarantee: ExtensionPrivacyGuarantee,
     val defaultEnablementState: ExtensionEnablementState,
     val trustRequirement: ExtensionTrustRequirement,
+    val providerSurface: RuntimeProviderSurface = RuntimeProviderSurface.GENERIC_TOOL,
+    val requiredPermissions: List<String> = emptyList(),
     val compatibilityVersionRange: IntRange = 1..1,
 )
 
@@ -59,6 +67,7 @@ data class ExtensionContributionSummary(
     val extensionType: RuntimeExtensionType,
     val capabilitySummary: String,
     val privacySummary: String,
+    val providerSurfaceSummary: String = "",
     val statusSummary: String,
     val enablementState: ExtensionEnablementState,
 )
@@ -86,6 +95,64 @@ object DefaultRuntimeExtensionRegistrations {
             privacyGuarantee = ExtensionPrivacyGuarantee.PRIVATE_BY_DEFAULT,
             defaultEnablementState = ExtensionEnablementState.ACTIVE,
             trustRequirement = ExtensionTrustRequirement.NONE,
+        ),
+        RuntimeExtensionRegistration(
+            extensionId = "provider.calendar.read.local",
+            extensionType = RuntimeExtensionType.TOOL_PROVIDER,
+            displayName = "Calendar Read Provider",
+            contributedCapabilities = listOf("calendar.read"),
+            requiredRecordFields = emptyList(),
+            requiredRuntimeMetadata = listOf("tool_contract.v1", "provider.read.local", "system_source.calendar"),
+            privacyGuarantee = ExtensionPrivacyGuarantee.EXPLICIT_POLICY_CHECK,
+            defaultEnablementState = ExtensionEnablementState.ACTIVE,
+            trustRequirement = ExtensionTrustRequirement.NONE,
+            providerSurface = RuntimeProviderSurface.EXPLICIT_READ,
+            requiredPermissions = listOf("android.permission.READ_CALENDAR"),
+        ),
+        RuntimeExtensionRegistration(
+            extensionId = "provider.contacts.read.local",
+            extensionType = RuntimeExtensionType.TOOL_PROVIDER,
+            displayName = "Contacts Read Provider",
+            contributedCapabilities = listOf("contacts.read"),
+            requiredRecordFields = emptyList(),
+            requiredRuntimeMetadata = listOf("tool_contract.v1", "provider.read.local", "system_source.contacts"),
+            privacyGuarantee = ExtensionPrivacyGuarantee.EXPLICIT_POLICY_CHECK,
+            defaultEnablementState = ExtensionEnablementState.ACTIVE,
+            trustRequirement = ExtensionTrustRequirement.NONE,
+            providerSurface = RuntimeProviderSurface.EXPLICIT_READ,
+            requiredPermissions = listOf("android.permission.READ_CONTACTS"),
+        ),
+        RuntimeExtensionRegistration(
+            extensionId = "provider.calendar.write.local",
+            extensionType = RuntimeExtensionType.TOOL_PROVIDER,
+            displayName = "Calendar Write Provider",
+            contributedCapabilities = listOf("calendar.write"),
+            requiredRecordFields = emptyList(),
+            requiredRuntimeMetadata = listOf("tool_contract.v1", "provider.mutation.local", "system_source.calendar"),
+            privacyGuarantee = ExtensionPrivacyGuarantee.EXPLICIT_POLICY_CHECK,
+            defaultEnablementState = ExtensionEnablementState.ACTIVE,
+            trustRequirement = ExtensionTrustRequirement.NONE,
+            providerSurface = RuntimeProviderSurface.EXPLICIT_MUTATION,
+            requiredPermissions = listOf(
+                "android.permission.READ_CALENDAR",
+                "android.permission.WRITE_CALENDAR",
+            ),
+        ),
+        RuntimeExtensionRegistration(
+            extensionId = "provider.calendar.delete.local",
+            extensionType = RuntimeExtensionType.TOOL_PROVIDER,
+            displayName = "Calendar Delete Provider",
+            contributedCapabilities = listOf("calendar.delete"),
+            requiredRecordFields = emptyList(),
+            requiredRuntimeMetadata = listOf("tool_contract.v1", "provider.mutation.local", "system_source.calendar"),
+            privacyGuarantee = ExtensionPrivacyGuarantee.EXPLICIT_POLICY_CHECK,
+            defaultEnablementState = ExtensionEnablementState.ACTIVE,
+            trustRequirement = ExtensionTrustRequirement.NONE,
+            providerSurface = RuntimeProviderSurface.EXPLICIT_MUTATION,
+            requiredPermissions = listOf(
+                "android.permission.READ_CALENDAR",
+                "android.permission.WRITE_CALENDAR",
+            ),
         ),
         RuntimeExtensionRegistration(
             extensionId = "context.contacts.system",
