@@ -5,6 +5,7 @@ enum class StructuredActionType(
 ) {
     MESSAGE_SEND("message.send"),
     CALENDAR_WRITE("calendar.write"),
+    CALENDAR_DELETE("calendar.delete"),
     EXTERNAL_SHARE("external.share"),
     ;
 

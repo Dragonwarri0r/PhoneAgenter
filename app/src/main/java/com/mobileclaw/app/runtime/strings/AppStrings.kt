@@ -3,6 +3,9 @@ package com.mobileclaw.app.runtime.strings
 import android.content.Context
 import androidx.annotation.StringRes
 import com.mobileclaw.app.R
+import com.mobileclaw.app.runtime.contribution.ContributionLifecyclePoint
+import com.mobileclaw.app.runtime.contribution.ContributionOutcomeState
+import com.mobileclaw.app.runtime.contribution.RuntimeContributionAvailabilityState
 import com.mobileclaw.app.runtime.localchat.ModelAvailabilityStatus
 import com.mobileclaw.app.runtime.capability.ProviderType
 import com.mobileclaw.app.runtime.capability.ToolSideEffectType
@@ -11,6 +14,11 @@ import com.mobileclaw.app.runtime.action.PayloadCompletenessState
 import com.mobileclaw.app.runtime.action.StructuredActionType
 import com.mobileclaw.app.runtime.governance.GovernanceGrantState
 import com.mobileclaw.app.runtime.governance.GovernanceTrustMode
+import com.mobileclaw.app.runtime.knowledge.KnowledgeAvailabilityState
+import com.mobileclaw.app.runtime.knowledge.KnowledgeConfidenceLabel
+import com.mobileclaw.app.runtime.knowledge.KnowledgeIngestionState
+import com.mobileclaw.app.runtime.knowledge.KnowledgeRedactionState
+import com.mobileclaw.app.runtime.knowledge.KnowledgeSourceType
 import com.mobileclaw.app.runtime.memory.ExportMode
 import com.mobileclaw.app.runtime.memory.ExtensionType
 import com.mobileclaw.app.runtime.memory.MemoryExposurePolicy
@@ -27,12 +35,19 @@ import com.mobileclaw.app.runtime.ingress.InteropEntryType
 import com.mobileclaw.app.runtime.ingress.UriGrantMode
 import com.mobileclaw.app.runtime.extension.ExtensionEnablementState
 import com.mobileclaw.app.runtime.extension.ExtensionPrivacyGuarantee
+import com.mobileclaw.app.runtime.extension.RuntimeProviderSurface
+import com.mobileclaw.app.runtime.extension.ExtensionTrustRequirement
 import com.mobileclaw.app.runtime.policy.ActionScope
 import com.mobileclaw.app.runtime.policy.ApprovalOutcomeType
 import com.mobileclaw.app.runtime.policy.PolicyDecisionType
 import com.mobileclaw.app.runtime.policy.RiskLevel
 import com.mobileclaw.app.runtime.session.RuntimeStageType
 import com.mobileclaw.app.runtime.systemsource.SystemSourceId
+import com.mobileclaw.app.runtime.workflow.WorkflowAvailabilityState
+import com.mobileclaw.app.runtime.workflow.WorkflowCheckpointState
+import com.mobileclaw.app.runtime.workflow.WorkflowRunState
+import com.mobileclaw.app.runtime.workflow.WorkflowStepType
+import com.mobileclaw.app.runtime.workflow.WorkflowTriggerType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -177,6 +192,14 @@ class AppStrings @Inject constructor(
         },
     )
 
+    fun extensionTrustRequirementLabel(requirement: ExtensionTrustRequirement): String = get(
+        when (requirement) {
+            ExtensionTrustRequirement.NONE -> R.string.extension_trust_none
+            ExtensionTrustRequirement.TRUSTED_CALLER -> R.string.extension_trust_trusted_caller
+            ExtensionTrustRequirement.PRIVILEGED_CONTEXT -> R.string.extension_trust_privileged_context
+        },
+    )
+
     fun extensionEnablementStateLabel(state: ExtensionEnablementState): String = get(
         when (state) {
             ExtensionEnablementState.ACTIVE -> R.string.extension_enablement_active
@@ -192,6 +215,7 @@ class AppStrings @Inject constructor(
             ActionScope.CALENDAR_READ -> R.string.policy_scope_calendar_read
             ActionScope.MESSAGE_SEND -> R.string.policy_scope_message_send
             ActionScope.CALENDAR_WRITE -> R.string.policy_scope_calendar_write
+            ActionScope.CALENDAR_DELETE -> R.string.policy_scope_calendar_delete
             ActionScope.ALARM_SET -> R.string.policy_scope_alarm_set
             ActionScope.ALARM_SHOW -> R.string.policy_scope_alarm_show
             ActionScope.ALARM_DISMISS -> R.string.policy_scope_alarm_dismiss
@@ -234,10 +258,70 @@ class AppStrings @Inject constructor(
     fun providerTypeLabel(providerType: ProviderType): String = get(
         when (providerType) {
             ProviderType.LOCAL -> R.string.bridge_provider_local
+            ProviderType.CONTENT_RESOLVER -> R.string.bridge_provider_content_resolver
             ProviderType.APP_FUNCTIONS -> R.string.bridge_provider_appfunctions
             ProviderType.INTENT -> R.string.bridge_provider_intent
             ProviderType.SHARE -> R.string.bridge_provider_share
             ProviderType.ACCESSIBILITY -> R.string.bridge_provider_accessibility
+        },
+    )
+
+    fun extensionProviderSurfaceLabel(surface: RuntimeProviderSurface): String = get(
+        when (surface) {
+            RuntimeProviderSurface.GENERIC_TOOL -> R.string.extension_provider_surface_generic
+            RuntimeProviderSurface.EXPLICIT_READ -> R.string.extension_provider_surface_read
+            RuntimeProviderSurface.EXPLICIT_MUTATION -> R.string.extension_provider_surface_mutation
+        },
+    )
+
+    fun workflowAvailabilityLabel(state: WorkflowAvailabilityState): String = get(
+        when (state) {
+            WorkflowAvailabilityState.READY -> R.string.workflow_availability_ready
+            WorkflowAvailabilityState.DISABLED -> R.string.workflow_availability_disabled
+            WorkflowAvailabilityState.BLOCKED -> R.string.workflow_availability_blocked
+            WorkflowAvailabilityState.DEGRADED -> R.string.workflow_availability_degraded
+        },
+    )
+
+    fun workflowRunStateLabel(state: WorkflowRunState): String = get(
+        when (state) {
+            WorkflowRunState.RUNNING -> R.string.workflow_run_state_running
+            WorkflowRunState.PAUSED -> R.string.workflow_run_state_paused
+            WorkflowRunState.AWAITING_APPROVAL -> R.string.workflow_run_state_awaiting_approval
+            WorkflowRunState.COMPLETED -> R.string.workflow_run_state_completed
+            WorkflowRunState.FAILED -> R.string.workflow_run_state_failed
+            WorkflowRunState.CANCELLED -> R.string.workflow_run_state_cancelled
+            WorkflowRunState.RESUMABLE -> R.string.workflow_run_state_resumable
+        },
+    )
+
+    fun workflowCheckpointStateLabel(state: WorkflowCheckpointState): String = get(
+        when (state) {
+            WorkflowCheckpointState.READY -> R.string.workflow_checkpoint_ready
+            WorkflowCheckpointState.RUNNING -> R.string.workflow_checkpoint_running
+            WorkflowCheckpointState.WAITING_APPROVAL -> R.string.workflow_checkpoint_waiting_approval
+            WorkflowCheckpointState.BLOCKED -> R.string.workflow_checkpoint_blocked
+            WorkflowCheckpointState.PAUSED -> R.string.workflow_checkpoint_paused
+            WorkflowCheckpointState.COMPLETED -> R.string.workflow_checkpoint_completed
+            WorkflowCheckpointState.FAILED -> R.string.workflow_checkpoint_failed
+            WorkflowCheckpointState.CANCELLED -> R.string.workflow_checkpoint_cancelled
+        },
+    )
+
+    fun workflowStepTypeLabel(type: WorkflowStepType): String = get(
+        when (type) {
+            WorkflowStepType.CONTEXT_CONTRIBUTION -> R.string.workflow_step_type_context
+            WorkflowStepType.GUARD -> R.string.workflow_step_type_guard
+            WorkflowStepType.APPROVAL_GATE -> R.string.workflow_step_type_approval
+            WorkflowStepType.ACTION -> R.string.workflow_step_type_action
+        },
+    )
+
+    fun workflowTriggerTypeLabel(type: WorkflowTriggerType): String = get(
+        when (type) {
+            WorkflowTriggerType.MANUAL -> R.string.workflow_trigger_manual
+            WorkflowTriggerType.SHARE_INGRESS -> R.string.workflow_trigger_share_ingress
+            WorkflowTriggerType.KNOWLEDGE_REFRESH -> R.string.workflow_trigger_knowledge_refresh
         },
     )
 
@@ -324,6 +408,7 @@ class AppStrings @Inject constructor(
         when (type) {
             StructuredActionType.MESSAGE_SEND -> R.string.structured_type_message_send
             StructuredActionType.CALENDAR_WRITE -> R.string.structured_type_calendar_write
+            StructuredActionType.CALENDAR_DELETE -> R.string.structured_type_calendar_delete
             StructuredActionType.EXTERNAL_SHARE -> R.string.structured_type_external_share
         },
     )
@@ -333,6 +418,90 @@ class AppStrings @Inject constructor(
             PayloadCompletenessState.COMPLETE -> R.string.structured_completeness_complete
             PayloadCompletenessState.PARTIAL -> R.string.structured_completeness_partial
             PayloadCompletenessState.INSUFFICIENT -> R.string.structured_completeness_insufficient
+        },
+    )
+
+    fun contributionAvailabilityLabel(state: RuntimeContributionAvailabilityState): String = get(
+        when (state) {
+            RuntimeContributionAvailabilityState.ENABLED -> R.string.runtime_contribution_availability_enabled
+            RuntimeContributionAvailabilityState.DISABLED -> R.string.runtime_contribution_availability_disabled
+            RuntimeContributionAvailabilityState.DEGRADED -> R.string.runtime_contribution_availability_degraded
+            RuntimeContributionAvailabilityState.INCOMPATIBLE -> R.string.runtime_contribution_availability_incompatible
+        },
+    )
+
+    fun contributionOutcomeLabel(state: ContributionOutcomeState): String = get(
+        when (state) {
+            ContributionOutcomeState.APPLIED -> R.string.runtime_contribution_outcome_applied
+            ContributionOutcomeState.SKIPPED -> R.string.runtime_contribution_outcome_skipped
+            ContributionOutcomeState.DEGRADED -> R.string.runtime_contribution_outcome_degraded
+            ContributionOutcomeState.BLOCKED -> R.string.runtime_contribution_outcome_blocked
+            ContributionOutcomeState.UNAVAILABLE -> R.string.runtime_contribution_outcome_unavailable
+        },
+    )
+
+    fun contributionLifecyclePointLabel(point: ContributionLifecyclePoint): String = get(
+        when (point) {
+            ContributionLifecyclePoint.INGRESS -> R.string.runtime_contribution_point_ingress
+            ContributionLifecyclePoint.PLANNING -> R.string.runtime_contribution_point_planning
+            ContributionLifecyclePoint.CONTEXT_ATTACH -> R.string.runtime_contribution_point_context_attach
+            ContributionLifecyclePoint.APPROVAL -> R.string.runtime_contribution_point_approval
+            ContributionLifecyclePoint.EXECUTION -> R.string.runtime_contribution_point_execution
+            ContributionLifecyclePoint.REFLECTION -> R.string.runtime_contribution_point_reflection
+        },
+    )
+
+    fun contributionTrustLine(summary: String): String = get(R.string.runtime_contribution_line_trust, summary)
+
+    fun contributionScopeLine(summary: String): String = get(R.string.runtime_contribution_line_scope, summary)
+
+    fun contributionPrivacyLine(summary: String): String = get(R.string.runtime_contribution_line_privacy, summary)
+
+    fun contributionPolicyLine(summary: String): String = get(R.string.runtime_contribution_line_policy, summary)
+
+    fun contributionDependencyLine(summary: String): String = get(R.string.runtime_contribution_line_dependency, summary)
+
+    fun contributionLimitationLine(summary: String): String = get(R.string.runtime_contribution_line_limitation, summary)
+
+    fun knowledgeSourceTypeLabel(sourceType: KnowledgeSourceType): String = get(
+        when (sourceType) {
+            KnowledgeSourceType.FILE -> R.string.knowledge_source_type_file
+            KnowledgeSourceType.DOCUMENT_COLLECTION -> R.string.knowledge_source_type_collection
+        },
+    )
+
+    fun knowledgeIngestionStateLabel(state: KnowledgeIngestionState): String = get(
+        when (state) {
+            KnowledgeIngestionState.PENDING -> R.string.knowledge_ingestion_state_pending
+            KnowledgeIngestionState.INGESTING -> R.string.knowledge_ingestion_state_ingesting
+            KnowledgeIngestionState.READY -> R.string.knowledge_ingestion_state_ready
+            KnowledgeIngestionState.PARTIAL -> R.string.knowledge_ingestion_state_partial
+            KnowledgeIngestionState.FAILED -> R.string.knowledge_ingestion_state_failed
+        },
+    )
+
+    fun knowledgeAvailabilityLabel(state: KnowledgeAvailabilityState): String = get(
+        when (state) {
+            KnowledgeAvailabilityState.HEALTHY -> R.string.knowledge_availability_healthy
+            KnowledgeAvailabilityState.STALE -> R.string.knowledge_availability_stale
+            KnowledgeAvailabilityState.PARTIAL -> R.string.knowledge_availability_partial
+            KnowledgeAvailabilityState.EXCLUDED -> R.string.knowledge_availability_excluded
+            KnowledgeAvailabilityState.MISSING -> R.string.knowledge_availability_missing
+        },
+    )
+
+    fun knowledgeConfidenceLabel(confidenceLabel: KnowledgeConfidenceLabel): String = get(
+        when (confidenceLabel) {
+            KnowledgeConfidenceLabel.HIGH -> R.string.knowledge_confidence_high
+            KnowledgeConfidenceLabel.MEDIUM -> R.string.knowledge_confidence_medium
+            KnowledgeConfidenceLabel.LOW -> R.string.knowledge_confidence_low
+        },
+    )
+
+    fun knowledgeRedactionLabel(redactionState: KnowledgeRedactionState): String = get(
+        when (redactionState) {
+            KnowledgeRedactionState.EXCERPT -> R.string.knowledge_redaction_excerpt
+            KnowledgeRedactionState.SUMMARY_ONLY -> R.string.knowledge_redaction_summary_only
         },
     )
 

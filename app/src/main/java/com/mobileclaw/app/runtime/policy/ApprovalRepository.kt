@@ -5,6 +5,7 @@ import com.mobileclaw.app.runtime.action.ActionNormalizationResult
 import com.mobileclaw.app.runtime.capability.ToolDescriptor
 import com.mobileclaw.app.runtime.capability.ToolPreviewFactory
 import com.mobileclaw.app.runtime.capability.ToolVisibilitySnapshot
+import com.mobileclaw.app.runtime.provider.ExplicitReadToolRequest
 import com.mobileclaw.app.runtime.session.RuntimeContextPayload
 import com.mobileclaw.app.runtime.session.RuntimeRequest
 import com.mobileclaw.app.runtime.strings.AppStrings
@@ -30,6 +31,7 @@ class ApprovalRepository @Inject constructor(
         toolDescriptor: ToolDescriptor,
         visibilitySnapshot: ToolVisibilitySnapshot?,
         normalization: ActionNormalizationResult? = null,
+        explicitReadRequest: ExplicitReadToolRequest? = null,
     ): ApprovalRequest {
         val executionPreview = toolPreviewFactory.createPreview(
             descriptor = toolDescriptor,
@@ -37,6 +39,7 @@ class ApprovalRepository @Inject constructor(
             contextPayload = contextPayload,
             structuredPreview = normalization?.preview,
             visibilitySnapshot = visibilitySnapshot,
+            explicitReadRequest = explicitReadRequest,
         )
         val approvalRequest = ApprovalRequest(
             approvalRequestId = "approval-${System.currentTimeMillis()}-$sessionId",
@@ -58,6 +61,7 @@ class ApprovalRepository @Inject constructor(
                 contextPayload = contextPayload,
                 scope = scope,
                 normalization = normalization,
+                explicitReadRequest = explicitReadRequest,
                 toolDescriptor = toolDescriptor,
                 executionPreview = executionPreview,
             ),
@@ -142,11 +146,44 @@ class ApprovalRepository @Inject constructor(
         return approvalDao.getLatestRequestForSession(sessionId)
     }
 
+    suspend fun createWorkflowApprovalRequest(
+        sessionId: String,
+        toolId: String,
+        toolDisplayName: String,
+        sideEffectLabel: String,
+        scopeLines: List<String>,
+        previewLines: List<String>,
+        title: String,
+        summary: String,
+        previewPayload: String,
+    ): ApprovalRequest {
+        val approvalRequest = ApprovalRequest(
+            approvalRequestId = "approval-${System.currentTimeMillis()}-$sessionId",
+            sessionId = sessionId,
+            decisionId = "workflow-decision-$sessionId-${System.currentTimeMillis()}",
+            toolId = toolId,
+            toolDisplayName = toolDisplayName,
+            sideEffectLabel = sideEffectLabel,
+            scopeLines = scopeLines,
+            previewLines = previewLines,
+            title = title,
+            summary = summary,
+            previewPayload = previewPayload,
+            primaryActionLabel = appStrings.get(R.string.approval_action_approve),
+            secondaryActionLabel = appStrings.get(R.string.approval_action_reject),
+            localeTag = appStrings.localeTag(),
+            status = ApprovalRequestStatus.PENDING,
+        )
+        approvalDao.upsertApprovalRequest(approvalRequest)
+        return approvalRequest
+    }
+
     private fun buildPreviewPayload(
         request: RuntimeRequest,
         contextPayload: RuntimeContextPayload,
         scope: ActionScope,
         normalization: ActionNormalizationResult?,
+        explicitReadRequest: ExplicitReadToolRequest?,
         toolDescriptor: ToolDescriptor,
         executionPreview: com.mobileclaw.app.runtime.capability.ToolExecutionPreview,
     ): String {
@@ -157,6 +194,13 @@ class ApprovalRepository @Inject constructor(
                 toolDescriptor.displayName,
                 appStrings.toolSideEffectLabel(executionPreview.sideEffectType),
                 appStrings.payloadCompletenessLabel(structuredPreview.completenessState),
+            )
+        } else if (explicitReadRequest != null) {
+            appStrings.get(
+                R.string.approval_preview_read_payload,
+                toolDescriptor.displayName,
+                explicitReadRequest.queryScope.displayLabel,
+                explicitReadRequest.queryText,
             )
         } else {
             appStrings.get(

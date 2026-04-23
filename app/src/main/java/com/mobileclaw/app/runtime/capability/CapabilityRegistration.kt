@@ -2,6 +2,7 @@ package com.mobileclaw.app.runtime.capability
 
 enum class ProviderType {
     LOCAL,
+    CONTENT_RESOLVER,
     APP_FUNCTIONS,
     INTENT,
     SHARE,
@@ -36,6 +37,8 @@ data class CapabilityRegistration(
     val requiredScopes: List<String>,
     val riskLevelHint: String,
     val confirmationPolicy: ConfirmationPolicy,
+    val invocationKind: ToolInvocationKind,
+    val freeformSelectionPolicy: FreeformSelectionPolicy,
     val supportedExtensionTypes: List<String> = emptyList(),
     val providerDescriptors: List<ProviderDescriptor>,
     val availability: CapabilityAvailabilityState,

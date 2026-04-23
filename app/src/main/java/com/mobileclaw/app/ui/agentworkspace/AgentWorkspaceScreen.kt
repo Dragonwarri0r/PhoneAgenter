@@ -3,6 +3,7 @@ package com.mobileclaw.app.ui.agentworkspace
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -28,22 +30,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mobileclaw.app.R
 import com.mobileclaw.app.ui.agentworkspace.components.ApprovalSheet
+import com.mobileclaw.app.ui.agentworkspace.components.AutomationCenterSheet
 import com.mobileclaw.app.ui.agentworkspace.components.ComposerDock
 import com.mobileclaw.app.ui.agentworkspace.components.ContextInspectorSheet
 import com.mobileclaw.app.ui.agentworkspace.components.ConversationLayer
 import com.mobileclaw.app.ui.agentworkspace.components.GovernanceCenterSheet
 import com.mobileclaw.app.ui.agentworkspace.components.InlineFailureBanner
+import com.mobileclaw.app.ui.agentworkspace.components.KnowledgeCenterSheet
 import com.mobileclaw.app.ui.agentworkspace.components.ModelPickerSheet
 import com.mobileclaw.app.ui.agentworkspace.components.PortabilityBundleSheet
-import com.mobileclaw.app.ui.agentworkspace.components.QuickActionStrip
 import com.mobileclaw.app.ui.agentworkspace.components.ResetSessionDialog
 import com.mobileclaw.app.ui.agentworkspace.components.RuntimeControlCenterSheet
+import com.mobileclaw.app.ui.agentworkspace.components.WorkflowRunBanner
+import com.mobileclaw.app.ui.agentworkspace.components.WorkspaceConversationStarter
 import com.mobileclaw.app.ui.agentworkspace.components.WorkspaceEmptyState
 import com.mobileclaw.app.ui.agentworkspace.components.WorkspaceFeedbackHost
 import com.mobileclaw.app.ui.agentworkspace.components.WorkspaceHeader
@@ -58,14 +64,20 @@ fun AgentWorkspaceScreen(
     var showModelPicker by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     var showContextInspector by remember { mutableStateOf(false) }
+    var showKnowledgeCenter by remember { mutableStateOf(false) }
+    var showAutomationCenter by remember { mutableStateOf(false) }
     var showGovernanceCenter by remember { mutableStateOf(false) }
     var showRuntimeControlCenter by remember { mutableStateOf(false) }
+    var selectedKnowledgeAssetId by remember { mutableStateOf<String?>(null) }
+    var selectedWorkflowDefinitionId by remember { mutableStateOf<String?>(null) }
+    var selectedWorkflowRunId by remember { mutableStateOf<String?>(null) }
     var topPanelsExpanded by remember { mutableStateOf(true) }
-    var restoreExpandedAfterIme by remember { mutableStateOf(false) }
     var topChromeHeightPx by remember { mutableStateOf(0) }
     var bottomChromeHeightPx by remember { mutableStateOf(0) }
     val density = LocalDensity.current
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    val workflowPauseLabel = stringResource(R.string.workflow_action_pause)
+    val workflowResumeLabel = stringResource(R.string.workflow_action_resume)
     val importModelLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -74,17 +86,31 @@ fun AgentWorkspaceScreen(
         }
     }
     val imageAttachmentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
+        contract = ActivityResultContracts.GetContent(),
     ) { uri ->
         if (uri != null) {
             viewModel.onAddImageAttachment(uri)
         }
     }
     val audioAttachmentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
+        contract = ActivityResultContracts.GetContent(),
     ) { uri ->
         if (uri != null) {
             viewModel.onAddAudioAttachment(uri)
+        }
+    }
+    val knowledgeFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.onIngestKnowledgeDocuments(listOf(uri))
+        }
+    }
+    val knowledgeCollectionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            viewModel.onIngestKnowledgeDocuments(uris)
         }
     }
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -101,11 +127,7 @@ fun AgentWorkspaceScreen(
     }
     LaunchedEffect(imeVisible) {
         if (imeVisible && topPanelsExpanded) {
-            restoreExpandedAfterIme = true
             topPanelsExpanded = false
-        } else if (!imeVisible && restoreExpandedAfterIme) {
-            topPanelsExpanded = true
-            restoreExpandedAfterIme = false
         }
     }
 
@@ -120,10 +142,24 @@ fun AgentWorkspaceScreen(
             uiState.modelHealth.supportsImage
         val supportsAudio = uiState.activeModel?.modalityCapabilities?.supportsAudio == true ||
             uiState.modelHealth.supportsAudio
+        val headerModelLabel = uiState.activeModel?.displayName
+            ?: uiState.modelHealth.displayName.ifBlank {
+                stringResource(R.string.model_no_model_selected)
+            }
+        val headerModelStatus = uiState.modelHealth.headline.ifBlank {
+            uiState.runtimeStatus.stageLabel
+        }.ifBlank {
+            uiState.runtimeStatus.supportingText
+        }
         val topChromeHeight = with(density) { topChromeHeightPx.toDp() }
         val bottomChromeHeight = with(density) { bottomChromeHeightPx.toDp() }
         val topContentPadding = 12.dp + if (topChromeHeight > 0.dp) topChromeHeight else 128.dp
         val bottomContentPadding = 12.dp + if (bottomChromeHeight > 0.dp) bottomChromeHeight else 132.dp
+        val showModelRecoveryState = uiState.screenState == WorkspaceScreenState.RECOVERABLE_FAILURE &&
+            uiState.turns.isEmpty()
+        val showConversationStarter = uiState.turns.isEmpty() &&
+            uiState.isModelReady &&
+            uiState.isComposerEnabled
 
         WorkspacePlaceholderCard(
             title = "",
@@ -132,12 +168,21 @@ fun AgentWorkspaceScreen(
                 .fillMaxSize()
                 .padding(top = topContentPadding, bottom = bottomContentPadding),
             bodyContent = {
-                if (uiState.screenState == WorkspaceScreenState.PREPARING || uiState.screenState == WorkspaceScreenState.UNAVAILABLE) {
+                if (uiState.screenState == WorkspaceScreenState.PREPARING ||
+                    uiState.screenState == WorkspaceScreenState.UNAVAILABLE ||
+                    showModelRecoveryState
+                ) {
                     WorkspaceEmptyState(
-                        title = if (uiState.screenState == WorkspaceScreenState.PREPARING) {
-                            stringResource(R.string.workspace_preparing_local_runtime)
-                        } else {
-                            stringResource(R.string.workspace_no_ready_local_model)
+                        title = when {
+                            uiState.screenState == WorkspaceScreenState.PREPARING -> {
+                                stringResource(R.string.workspace_preparing_local_runtime)
+                            }
+                            showModelRecoveryState -> {
+                                stringResource(R.string.workspace_recovery_needed)
+                            }
+                            else -> {
+                                stringResource(R.string.workspace_no_ready_local_model)
+                            }
                         },
                         body = uiState.runtimeStatus.supportingText,
                         actionLabel = stringResource(R.string.common_choose_model),
@@ -148,6 +193,18 @@ fun AgentWorkspaceScreen(
                     ConversationLayer(
                         turns = uiState.turns,
                         contentPadding = PaddingValues(bottom = 4.dp),
+                        emptyContent = if (showConversationStarter) {
+                            {
+                                WorkspaceConversationStarter(
+                                    statusLine = uiState.statusDigest.headline.ifBlank {
+                                        uiState.modelHealth.headline
+                                    },
+                                    onQuickPromptSelected = viewModel::onQuickPromptSelected,
+                                )
+                            }
+                        } else {
+                            null
+                        },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -163,6 +220,8 @@ fun AgentWorkspaceScreen(
         ) {
             WorkspaceHeader(
                 sessionId = uiState.activeSessionId,
+                modelLabel = headerModelLabel,
+                modelStatus = headerModelStatus,
                 panelsExpanded = topPanelsExpanded,
                 onModelClicked = { showModelPicker = true },
                 onGovernanceClicked = { showGovernanceCenter = true },
@@ -179,6 +238,7 @@ fun AgentWorkspaceScreen(
                                 arrayOf(
                                     android.Manifest.permission.READ_CONTACTS,
                                     android.Manifest.permission.READ_CALENDAR,
+                                    android.Manifest.permission.WRITE_CALENDAR,
                                 ),
                             )
                         },
@@ -199,6 +259,8 @@ fun AgentWorkspaceScreen(
                             when (entryId) {
                                 "model" -> showModelPicker = true
                                 "context" -> showContextInspector = true
+                                "knowledge" -> showKnowledgeCenter = true
+                                "automation" -> showAutomationCenter = true
                                 "governance" -> showGovernanceCenter = true
                                 "details" -> showRuntimeControlCenter = true
                             }
@@ -215,9 +277,27 @@ fun AgentWorkspaceScreen(
                 .onSizeChanged { bottomChromeHeightPx = it.height },
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            AnimatedVisibility(visible = uiState.isModelReady) {
-                QuickActionStrip(
-                    onQuickPromptSelected = viewModel::onQuickPromptSelected,
+            uiState.automationArea.activeRunBanner?.let { banner ->
+                WorkflowRunBanner(
+                    banner = banner,
+                    onPrimaryAction = {
+                        when (banner.primaryActionLabel) {
+                            workflowPauseLabel -> {
+                                viewModel.onPauseWorkflowRun(banner.workflowRunId)
+                            }
+                            workflowResumeLabel -> {
+                                viewModel.onResumeWorkflowRun(banner.workflowRunId)
+                            }
+                            else -> {
+                                showAutomationCenter = true
+                                selectedWorkflowRunId = banner.workflowRunId
+                            }
+                        }
+                    },
+                    onSecondaryAction = {
+                        showAutomationCenter = true
+                        selectedWorkflowRunId = banner.workflowRunId
+                    },
                 )
             }
             ComposerDock(
@@ -228,8 +308,8 @@ fun AgentWorkspaceScreen(
                 pendingAttachments = uiState.pendingAttachments,
                 activeAttachments = uiState.activeAttachments,
                 onDraftChanged = viewModel::onDraftChanged,
-                onAddImageClicked = { imageAttachmentLauncher.launch(arrayOf("image/*")) },
-                onAddAudioClicked = { audioAttachmentLauncher.launch(arrayOf("audio/*")) },
+                onAddImageClicked = { imageAttachmentLauncher.launch("image/*") },
+                onAddAudioClicked = { audioAttachmentLauncher.launch("audio/*") },
                 onRemoveAttachment = viewModel::onRemovePendingAttachment,
                 onSendClicked = viewModel::onSendClicked,
             )
@@ -316,6 +396,14 @@ fun AgentWorkspaceScreen(
                             showRuntimeControlCenter = false
                             showContextInspector = true
                         }
+                        "knowledge" -> {
+                            showRuntimeControlCenter = false
+                            showKnowledgeCenter = true
+                        }
+                        "automation" -> {
+                            showRuntimeControlCenter = false
+                            showAutomationCenter = true
+                        }
                         "governance" -> {
                             showRuntimeControlCenter = false
                             showGovernanceCenter = true
@@ -327,11 +415,53 @@ fun AgentWorkspaceScreen(
                                 arrayOf(
                                     android.Manifest.permission.READ_CONTACTS,
                                     android.Manifest.permission.READ_CALENDAR,
+                                    android.Manifest.permission.WRITE_CALENDAR,
                                 ),
                             )
                         }
+                        else -> {
+                            if (artifactId.startsWith("contribution:")) {
+                                viewModel.onToggleContributionAvailability(
+                                    artifactId.removePrefix("contribution:"),
+                                )
+                            }
+                        }
                     }
                 },
+            )
+        }
+        if (showAutomationCenter) {
+            AutomationCenterSheet(
+                automationArea = uiState.automationArea,
+                selectedDefinition = uiState.automationArea.definitions.firstOrNull {
+                    it.workflowDefinitionId == selectedWorkflowDefinitionId
+                },
+                selectedRun = uiState.automationArea.runs.firstOrNull {
+                    it.workflowRunId == selectedWorkflowRunId
+                },
+                onDismiss = {
+                    showAutomationCenter = false
+                    selectedWorkflowDefinitionId = null
+                    selectedWorkflowRunId = null
+                },
+                onCreateTemplate = viewModel::onCreateWorkflowFromTemplate,
+                onOpenDefinition = { workflowDefinitionId ->
+                    selectedWorkflowDefinitionId = workflowDefinitionId
+                    selectedWorkflowRunId = null
+                },
+                onOpenRun = { workflowRunId ->
+                    selectedWorkflowRunId = workflowRunId
+                    selectedWorkflowDefinitionId = null
+                },
+                onCloseDetail = {
+                    selectedWorkflowDefinitionId = null
+                    selectedWorkflowRunId = null
+                },
+                onStartWorkflow = viewModel::onStartWorkflow,
+                onToggleWorkflowEnabled = viewModel::onToggleWorkflowEnabled,
+                onResumeRun = viewModel::onResumeWorkflowRun,
+                onPauseRun = viewModel::onPauseWorkflowRun,
+                onCancelRun = viewModel::onCancelWorkflowRun,
             )
         }
         if (showGovernanceCenter) {
@@ -340,6 +470,34 @@ fun AgentWorkspaceScreen(
                 onUpdateTrust = viewModel::onUpdateGovernanceTrust,
                 onUpdateScope = viewModel::onUpdateGovernanceScope,
                 onDismiss = { showGovernanceCenter = false },
+            )
+        }
+        if (showKnowledgeCenter) {
+            KnowledgeCenterSheet(
+                knowledgeArea = uiState.knowledgeArea,
+                selectedEntry = uiState.knowledgeArea.entries.firstOrNull {
+                    it.knowledgeAssetId == selectedKnowledgeAssetId
+                },
+                onDismiss = {
+                    showKnowledgeCenter = false
+                    selectedKnowledgeAssetId = null
+                },
+                onAddFile = {
+                    knowledgeFileLauncher.launch(
+                        arrayOf("text/*", "application/json", "application/xml"),
+                    )
+                },
+                onAddCollection = {
+                    knowledgeCollectionLauncher.launch(
+                        arrayOf("text/*", "application/json", "application/xml"),
+                    )
+                },
+                onOpenAsset = { knowledgeAssetId ->
+                    selectedKnowledgeAssetId = knowledgeAssetId
+                },
+                onCloseAsset = { selectedKnowledgeAssetId = null },
+                onRefreshAsset = viewModel::onRefreshKnowledgeAsset,
+                onToggleRetrievalInclusion = viewModel::onToggleKnowledgeRetrievalInclusion,
             )
         }
         uiState.pendingApproval?.let { approval ->
@@ -362,12 +520,25 @@ private fun WorkspacePlaceholderCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        shape = RoundedCornerShape(30.dp),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant,
+        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .background(
+                    brush = Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.55f),
+                            MaterialTheme.colorScheme.surfaceContainerLowest,
+                        ),
+                    ),
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (title.isNotBlank()) {
                 Text(

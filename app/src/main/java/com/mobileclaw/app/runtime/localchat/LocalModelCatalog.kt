@@ -52,6 +52,8 @@ interface LocalModelCatalog {
 
     suspend fun selectModel(modelId: String): LocalModelProfile?
 
+    suspend fun clearModelRuntimeFailure(modelId: String): LocalModelProfile?
+
     suspend fun importModel(sourceUri: Uri): ModelImportResult
 
     suspend fun updateModelCapabilities(

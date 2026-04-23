@@ -14,12 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-interface IntentFallbackBridge {
-    suspend fun discoverProviders(
-        capabilityId: String,
-        request: RuntimeRequest,
-    ): List<ProviderDescriptor>
-}
+interface IntentFallbackBridge : CapabilityDiscoveryBridge
 
 @Singleton
 class RealIntentFallbackBridge @Inject constructor(

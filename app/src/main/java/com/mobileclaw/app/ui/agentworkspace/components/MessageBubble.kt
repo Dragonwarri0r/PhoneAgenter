@@ -3,6 +3,7 @@ package com.mobileclaw.app.ui.agentworkspace.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -17,6 +18,7 @@ import com.mobileclaw.app.R
 import com.mobileclaw.app.ui.agentworkspace.model.ChatRoleUi
 import com.mobileclaw.app.ui.agentworkspace.model.ChatTurnStateUi
 import com.mobileclaw.app.ui.agentworkspace.model.ChatTurnUiModel
+import com.mobileclaw.app.ui.common.MarkdownText
 import com.mobileclaw.app.ui.theme.AtriumGlass
 import com.mobileclaw.app.ui.theme.atriumPrimaryBrush
 
@@ -49,7 +51,7 @@ fun MessageBubble(
             .background(background)
             .padding(horizontal = 14.dp, vertical = 11.dp),
     ) {
-        Column {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text = if (isUser) {
                     stringResource(R.string.workspace_you)
@@ -63,16 +65,28 @@ fun MessageBubble(
                     MaterialTheme.colorScheme.primary
                 },
             )
-            Text(
-                text = turn.content,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (isUser) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            if (turn.attachments.isNotEmpty()) {
+                AttachmentPreviewRail(
+                    attachments = turn.attachments,
+                    onRemoveAttachment = null,
+                )
+            }
+            if (turn.content.isNotBlank()) {
+                MarkdownText(
+                    text = turn.content,
+                    textColor = if (isUser) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    linkColor = if (isUser) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
             if (turn.state == ChatTurnStateUi.STREAMING) {
                 Text(
                     text = stringResource(R.string.workspace_streaming),

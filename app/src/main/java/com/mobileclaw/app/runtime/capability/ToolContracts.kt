@@ -14,6 +14,18 @@ enum class ToolSideEffectType {
     DISPATCH,
 }
 
+enum class ToolInvocationKind {
+    REPLY,
+    EXPLICIT_READ,
+    SIDE_EFFECT,
+}
+
+enum class FreeformSelectionPolicy {
+    FALLBACK_TO_REPLY,
+    SAFE_AUTO,
+    POLICY_GATED,
+}
+
 enum class ToolVisibilityState {
     VISIBLE,
     DEGRADED,
@@ -27,6 +39,7 @@ data class ToolBindingDescriptor(
     val androidContract: String,
     val requiredPermissions: List<String> = emptyList(),
     val primary: Boolean = false,
+    val bindingMetadata: Map<String, String> = emptyMap(),
 )
 
 data class ToolDescriptor(
@@ -37,10 +50,14 @@ data class ToolDescriptor(
     val inputSchema: ToolSchemaDescriptor,
     val outputSchema: ToolSchemaDescriptor? = null,
     val sideEffectType: ToolSideEffectType,
+    val invocationKind: ToolInvocationKind,
+    val freeformSelectionPolicy: FreeformSelectionPolicy,
     val riskLevelHint: String,
     val requiredScopes: List<String>,
     val confirmationPolicy: ConfirmationPolicy,
     val bindingDescriptors: List<ToolBindingDescriptor>,
+    val defaultResultLimit: Int = 0,
+    val selectionExamples: List<String> = emptyList(),
 )
 
 data class ToolVisibilitySnapshot(
@@ -50,6 +67,7 @@ data class ToolVisibilitySnapshot(
     val relevanceScore: Double,
     val allowedByGovernance: Boolean,
     val availableBindingCount: Int,
+    val primaryProviderId: String? = null,
 )
 
 data class ToolExecutionPreview(
@@ -61,4 +79,5 @@ data class ToolExecutionPreview(
     val previewFieldLines: List<String>,
     val warnings: List<String> = emptyList(),
     val canExecute: Boolean = true,
+    val routeExplanation: String = "",
 )

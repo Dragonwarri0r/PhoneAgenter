@@ -3,6 +3,7 @@ package com.mobileclaw.app.ui.agentworkspace.model
 data class GovernanceCenterUiModel(
     val callers: List<GovernanceCallerUiModel> = emptyList(),
     val activities: List<GovernanceActivityUiModel> = emptyList(),
+    val contributors: List<GovernanceContributorUiModel> = emptyList(),
 )
 
 data class GovernanceCallerUiModel(
@@ -34,4 +35,13 @@ data class GovernanceActivityUiModel(
     val headline: String,
     val details: String,
     val timestampLabel: String,
+)
+
+data class GovernanceContributorUiModel(
+    val contributionId: String,
+    val title: String,
+    val availabilityLabel: String,
+    val summary: String,
+    val governanceLines: List<String> = emptyList(),
+    val limitationSummary: String = "",
 )

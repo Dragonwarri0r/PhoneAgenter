@@ -15,12 +15,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 
-interface AppFunctionBridge {
-    suspend fun discoverProviders(
-        capabilityId: String,
-        request: RuntimeRequest,
-    ): List<ProviderDescriptor>
-}
+interface AppFunctionBridge : CapabilityDiscoveryBridge
 
 @Singleton
 class RealAppFunctionBridge @Inject constructor(

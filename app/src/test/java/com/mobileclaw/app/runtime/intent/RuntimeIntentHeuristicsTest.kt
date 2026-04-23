@@ -1,43 +1,124 @@
 package com.mobileclaw.app.runtime.intent
 
 import com.mobileclaw.app.runtime.policy.ActionScope
-import com.mobileclaw.app.runtime.session.DefaultRuntimePlanner
-import com.mobileclaw.app.runtime.session.RuntimeContextPayload
+import com.mobileclaw.app.runtime.session.CapabilityPlanningProposal
+import com.mobileclaw.app.runtime.session.CapabilityResolutionMode
+import com.mobileclaw.app.runtime.session.CapabilitySelectionSource
+import com.mobileclaw.app.runtime.session.RuntimeCapabilityHint
 import com.mobileclaw.app.runtime.session.RuntimeRequest
-import kotlinx.coroutines.runBlocking
+import com.mobileclaw.app.runtime.session.WorkspaceCapabilitySelector
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class RuntimeIntentHeuristicsTest {
-    @Test
-    fun `planner keeps internal workspace freeform chat in reply generation`() = runBlocking {
-        val planner = DefaultRuntimePlanner()
+    private val selector = WorkspaceCapabilitySelector()
 
-        val plan = planner.plan(
-            request = runtimeRequest("Text Alice that I'll be 10 minutes late."),
-            contextPayload = runtimeContextPayload(),
+    @Test
+    fun `explicit capability hints outrank workspace inference`() {
+        val decision = selector.select(
+            request = runtimeRequest(
+                userInput = "Text Alice that I'll be 10 minutes late.",
+                requestedCapabilities = listOf(RuntimeCapabilityHint(capabilityId = "message.send")),
+            ),
+            inferredIntent = RuntimeIntentHeuristics.infer("Text Alice that I'll be 10 minutes late."),
         )
 
-        assertEquals("generate.reply", plan.selectedCapabilityId)
+        assertEquals("message.send", decision.selectedCapabilityId)
+        assertEquals(CapabilitySelectionSource.EXPLICIT_HINT, decision.selectionSource)
     }
 
     @Test
-    fun `planner still accepts explicit capability hints for internal workspace`() = runBlocking {
-        val planner = DefaultRuntimePlanner()
-
-        val plan = planner.plan(
-            request = runtimeRequest(
-                userInput = "Text Alice that I'll be 10 minutes late.",
-                requestedCapabilities = listOf(
-                    com.mobileclaw.app.runtime.session.RuntimeCapabilityHint(
-                        capabilityId = "message.send",
-                    ),
-                ),
-            ),
-            contextPayload = runtimeContextPayload(),
+    fun `clear calendar lookup selects read capability for workspace input`() {
+        val rawInput = "What's on my calendar today?"
+        val decision = selector.select(
+            request = runtimeRequest(rawInput),
+            inferredIntent = RuntimeIntentHeuristics.infer(rawInput),
         )
 
-        assertEquals("message.send", plan.selectedCapabilityId)
+        assertEquals("calendar.read", decision.selectedCapabilityId)
+        assertEquals(CapabilityResolutionMode.EXPLICIT_READ, decision.resolutionMode)
+    }
+
+    @Test
+    fun `ambiguous workspace prompt falls back to reply mode`() {
+        val rawInput = "Can you help me around my meetings tomorrow?"
+        val decision = selector.select(
+            request = runtimeRequest(rawInput),
+            inferredIntent = RuntimeIntentHeuristics.infer(rawInput),
+        )
+
+        assertEquals("generate.reply", decision.selectedCapabilityId)
+        assertEquals(CapabilityResolutionMode.REPLY_FALLBACK, decision.resolutionMode)
+    }
+
+    @Test
+    fun `clear scheduling prompt stays on governed action path`() {
+        val rawInput = "Add lunch with Bob tomorrow at 1 PM to my calendar."
+        val decision = selector.select(
+            request = runtimeRequest(rawInput),
+            inferredIntent = RuntimeIntentHeuristics.infer(rawInput),
+        )
+
+        assertEquals("calendar.write", decision.selectedCapabilityId)
+        assertEquals(CapabilityResolutionMode.EXPLICIT_ACTION, decision.resolutionMode)
+    }
+
+    @Test
+    fun `mixed-language calendar lookup still selects read capability`() {
+        val rawInput = "show 我的 calendar today"
+        val decision = selector.select(
+            request = runtimeRequest(rawInput),
+            inferredIntent = RuntimeIntentHeuristics.infer(rawInput),
+        )
+
+        assertEquals("calendar.read", decision.selectedCapabilityId)
+        assertEquals(CapabilityResolutionMode.EXPLICIT_READ, decision.resolutionMode)
+    }
+
+    @Test
+    fun `clear calendar deletion prompt stays on governed action path`() {
+        val rawInput = "Delete the 'Codex validation event' event from my calendar tomorrow at 3 PM."
+        val decision = selector.select(
+            request = runtimeRequest(rawInput),
+            inferredIntent = RuntimeIntentHeuristics.infer(rawInput),
+        )
+
+        assertEquals("calendar.delete", decision.selectedCapabilityId)
+        assertEquals(CapabilityResolutionMode.EXPLICIT_ACTION, decision.resolutionMode)
+    }
+
+    @Test
+    fun `model planner proposal can promote clear calendar read requests`() {
+        val rawInput = "Can you show my schedule for today?"
+        val decision = selector.select(
+            request = runtimeRequest(rawInput),
+            inferredIntent = RuntimeIntentHeuristics.infer(rawInput),
+            plannerProposal = CapabilityPlanningProposal(
+                capabilityId = "calendar.read",
+                confidence = 0.76,
+                rationale = "The user is asking for a schedule lookup.",
+            ),
+        )
+
+        assertEquals("calendar.read", decision.selectedCapabilityId)
+        assertEquals(CapabilitySelectionSource.MODEL_PLANNER, decision.selectionSource)
+    }
+
+    @Test
+    fun `model planner proposal still falls back when the request is ambiguous`() {
+        val rawInput = "Can you help me around my meetings tomorrow?"
+        val decision = selector.select(
+            request = runtimeRequest(rawInput),
+            inferredIntent = RuntimeIntentHeuristics.infer(rawInput),
+            plannerProposal = CapabilityPlanningProposal(
+                capabilityId = "calendar.write",
+                confidence = 0.91,
+                rationale = "Meetings are mentioned.",
+            ),
+        )
+
+        assertEquals("generate.reply", decision.selectedCapabilityId)
+        assertEquals(CapabilitySelectionSource.REPLY_FALLBACK, decision.selectionSource)
     }
 
     @Test
@@ -68,18 +149,12 @@ class RuntimeIntentHeuristicsTest {
 
     private fun runtimeRequest(
         userInput: String,
-        requestedCapabilities: List<com.mobileclaw.app.runtime.session.RuntimeCapabilityHint> = emptyList(),
+        requestedCapabilities: List<RuntimeCapabilityHint> = emptyList(),
     ) = RuntimeRequest(
         requestId = "request-1",
         userInput = userInput,
         selectedModelId = "model-1",
         transcriptContext = emptyList(),
         requestedCapabilities = requestedCapabilities,
-    )
-
-    private fun runtimeContextPayload() = RuntimeContextPayload(
-        summary = "Fresh session",
-        transcriptTurnCount = 0,
-        hasTranscriptContext = false,
     )
 }

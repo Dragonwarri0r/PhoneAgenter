@@ -3,6 +3,9 @@ package com.mobileclaw.app.runtime.session
 import com.mobileclaw.app.runtime.capability.CallerIdentity
 import com.mobileclaw.app.runtime.capability.ToolVisibilitySnapshot
 import com.mobileclaw.app.runtime.action.ActionNormalizationResult
+import com.mobileclaw.app.runtime.contribution.ContextContribution
+import com.mobileclaw.app.runtime.contribution.ContributionOutcomeRecord
+import com.mobileclaw.app.runtime.contribution.KnowledgeRequestContribution
 import com.mobileclaw.app.runtime.capability.ProviderType
 import com.mobileclaw.app.runtime.ingress.ExternalInvocationRecord
 import com.mobileclaw.app.runtime.policy.ApprovalOutcome
@@ -10,6 +13,8 @@ import com.mobileclaw.app.runtime.policy.ApprovalRequest
 import com.mobileclaw.app.runtime.policy.AuditEvent
 import com.mobileclaw.app.runtime.policy.PolicyDecision
 import com.mobileclaw.app.runtime.policy.RiskAssessment
+import com.mobileclaw.app.runtime.provider.ExplicitReadToolRequest
+import com.mobileclaw.app.runtime.provider.ReadToolResult
 import com.mobileclaw.app.runtime.systemsource.SystemSourceContribution
 import com.mobileclaw.app.runtime.systemsource.SystemSourceDescriptor
 
@@ -62,8 +67,20 @@ sealed interface RuntimeSessionEvent {
         val contributions: List<SystemSourceContribution>,
     ) : RuntimeSessionEvent
 
+    data class ContributionsUpdated(
+        val outcomes: List<ContributionOutcomeRecord>,
+        val contextContributions: List<ContextContribution>,
+        val knowledgeContribution: KnowledgeRequestContribution? = null,
+    ) : RuntimeSessionEvent
+
     data class CallerVerified(
         val callerIdentity: CallerIdentity,
+    ) : RuntimeSessionEvent
+
+    data class CapabilitySelectionResolved(
+        val sessionId: String,
+        val outcome: CapabilitySelectionOutcome,
+        val explicitReadRequest: ExplicitReadToolRequest? = null,
     ) : RuntimeSessionEvent
 
     data class CapabilityRouted(
@@ -128,6 +145,7 @@ sealed interface RuntimeSessionEvent {
         val capabilityId: String,
         val providerId: String,
         val outputText: String,
+        val readResult: ReadToolResult? = null,
     ) : RuntimeSessionEvent
 
     data class CapabilityFailed(

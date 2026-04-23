@@ -46,5 +46,11 @@ interface LocalChatGateway {
         visibleTranscript: List<VisibleTranscriptEntry>,
     ): Flow<SessionStreamEvent>
 
+    suspend fun generateDetached(
+        modelId: String,
+        generationPrompt: String,
+        attachments: List<RuntimeAttachment> = emptyList(),
+    ): String
+
     suspend fun resetSession(sessionId: String): SessionResetResult
 }

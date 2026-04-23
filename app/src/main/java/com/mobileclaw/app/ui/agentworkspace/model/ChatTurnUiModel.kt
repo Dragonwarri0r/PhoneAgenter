@@ -16,5 +16,5 @@ data class ChatTurnUiModel(
     val role: ChatRoleUi,
     val content: String,
     val state: ChatTurnStateUi,
+    val attachments: List<AttachmentUiModel> = emptyList(),
 )
-

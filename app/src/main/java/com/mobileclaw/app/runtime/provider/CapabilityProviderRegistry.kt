@@ -10,11 +10,15 @@ class CapabilityProviderRegistry @Inject constructor(
     localGenerationProvider: LocalGenerationProvider,
     mockCapabilityProvider: MockCapabilityProvider,
     androidIntentCapabilityProvider: AndroidIntentCapabilityProvider,
+    calendarReadCapabilityProvider: CalendarReadCapabilityProvider,
+    calendarMutationCapabilityProvider: CalendarMutationCapabilityProvider,
 ) {
     private val providers = linkedMapOf(
         localGenerationProvider.providerId to localGenerationProvider,
         mockCapabilityProvider.providerId to mockCapabilityProvider,
         androidIntentCapabilityProvider.providerId to androidIntentCapabilityProvider,
+        calendarReadCapabilityProvider.providerId to calendarReadCapabilityProvider,
+        calendarMutationCapabilityProvider.providerId to calendarMutationCapabilityProvider,
     )
 
     fun getProvider(plan: RuntimePlan): CapabilityProvider? {

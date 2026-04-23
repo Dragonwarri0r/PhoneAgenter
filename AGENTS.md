@@ -1,6 +1,6 @@
 # mobile_claw Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-13
+Auto-generated from all feature plans. Last updated: 2026-04-23
 
 ## Active Technologies
 - Kotlin 2.2.x with Java 11 toolchain + Android Gradle Plugin 8.8.x, Jetpack Compose Material 3, Hilt, Kotlin coroutines and Flow, Preferences DataStore, Room (003-persona-memory-fabric)
@@ -34,6 +34,14 @@ Auto-generated from all feature plans. Last updated: 2026-04-13
 - Reuse existing runtime-local extension registrations and workspace state; no new durable storage required (017-unified-extension-surface)
 - Kotlin 2.2.x on Android with Java 11 toolchain + Jetpack Compose Material 3, Hilt, Coroutines/Flow, existing conversation-first workspace, runtime trace, governance, approval, and extension surfaces (018-runtime-control-center)
 - Reuse existing Room/DataStore-backed runtime state and consolidate control views in-app without adding remote storage (018-runtime-control-center)
+- Kotlin 2.2.x on Android with Java 11 toolchain + Jetpack Compose Material 3, Hilt, Coroutines/Flow, Room, existing runtime/memory/systemsource/session/contribution layers, Android local file/content access, current runtime control-center surfaces (020-knowledge-ingestion-and-retrieval)
+- Reuse local Room-backed runtime storage and app-managed local file access; add durable knowledge asset, ingestion, and retrieval metadata locally; if `MemoryDatabase` schema changes, bump `MemoryDatabase.version` in the same patch (020-knowledge-ingestion-and-retrieval)
+- Kotlin 2.2.x on Android with Java 11 toolchain + Jetpack Compose Material 3, Hilt, Coroutines/Flow, Room, existing runtime/session/policy/approval/contribution/knowledge layers, current runtime control-center surfaces (021-workflow-graph-and-automation)
+- Reuse local Room/DataStore-backed runtime state; add durable workflow definitions, run records, and resumable checkpoints locally; if `MemoryDatabase` schema changes, bump `MemoryDatabase.version` in the same patch (021-workflow-graph-and-automation)
+- Kotlin 2.2.x on Android with Java 11 toolchain + Jetpack Compose Material 3, Hilt, Coroutines/Flow, existing runtime/extension/session/systemsource/memory/policy/governance layers, current runtime control-center surfaces from `018` (019-runtime-hooks-and-context-sources)
+- Reuse existing local Room/DataStore-backed runtime state and audit paths; add runtime-local contributor descriptors and outcome summaries without introducing remote persistence or durable knowledge-corpus storage (019-runtime-hooks-and-context-sources)
+- Kotlin 2.2.x with Java 11 toolchain + Android Gradle Plugin 8.8.x, Jetpack Compose Material 3, Hilt, Kotlin coroutines and Flow, Room, existing runtime capability/policy/extension/session layers (023-capability-inference-read-tools)
+- Reuse local Room/DataStore-backed runtime state and audit history; no remote storage (023-capability-inference-read-tools)
 
 - (006-sync-extension-hooks)
 
@@ -53,11 +61,10 @@ tests/
 : Follow standard conventions
 
 ## Recent Changes
-- 018-runtime-control-center: Added Kotlin 2.2.x on Android with Java 11 toolchain + Jetpack Compose Material 3, Hilt, Coroutines/Flow, existing conversation-first workspace, runtime trace, governance, approval, and extension surfaces
-- 017-unified-extension-surface: Added Kotlin 2.2.x on Android with Java 11 toolchain + Jetpack Compose Material 3, Hilt, Coroutines/Flow, existing runtime extension/interop/governance/workspace layers
-- 016-external-caller-interop-contracts: Added Kotlin 2.2.x on Android with Java 11 toolchain + Jetpack Compose Material 3, Hilt, Coroutines/Flow, existing runtime ingress/session/capability/governance layers, current external handoff parser and share targets
+- 023-capability-inference-read-tools: Added Kotlin 2.2.x with Java 11 toolchain + Android Gradle Plugin 8.8.x, Jetpack Compose Material 3, Hilt, Kotlin coroutines and Flow, Room, existing runtime capability/policy/extension/session layers
+- 020-knowledge-ingestion-and-retrieval: Added Kotlin 2.2.x on Android with Java 11 toolchain + Jetpack Compose Material 3, Hilt, Coroutines/Flow, Room, existing runtime/memory/systemsource/session/contribution layers, Android local file/content access, current runtime control-center surfaces
+- 019-runtime-hooks-and-context-sources: Added Kotlin 2.2.x on Android with Java 11 toolchain + Jetpack Compose Material 3, Hilt, Coroutines/Flow, existing runtime/extension/session/systemsource/memory/policy/governance layers, current runtime control-center surfaces from `018`
 
 
 <!-- MANUAL ADDITIONS START -->
-- Room migration constraint: if any Room-managed schema changes in `MemoryDatabase`, bump `MemoryDatabase.version` in the same patch. The app currently relies on `fallbackToDestructiveMigration(dropAllTables = true)`, which only applies after a version change.
 <!-- MANUAL ADDITIONS END -->
