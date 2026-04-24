@@ -9,6 +9,20 @@ The split keeps the same two rules:
 - one spec should map to one primary milestone
 - one spec should still be independently demoable and valuable
 
+For interop-related work, the upstream docs-level design baseline now lives in [Hub Interop Protocol Design v1](./hub-interop-protocol-design-v1.md).
+That means future interop specs should treat Android share as a compatibility ingress, not as the long-term primary contract for hub-to-app communication.
+
+The agreed protocol docs set is now indexed in [Hub Interop Docs Index v1](./hub-interop-docs-index-v1.md).
+`022-hub-interop-protocol` remains an exploratory draft context, while implementation work starts from `024`.
+
+After the first `024-026` implementation pass, the product definition is now stricter:
+
+- `Hub Interop Protocol` is the public protocol / SDK / contract that other apps can depend on.
+- `Mobile Claw Host` is the governed execution center that authorizes, routes, executes, audits, and exposes user control.
+- `Interop Probe App` is the external conformance client that proves the protocol and host behavior can be used by an app with no `:app` dependency.
+
+This changes the next planning priority from "add more app features" to "stabilize the public protocol entry, harden Mobile Claw as a trusted host, and turn the probe into a repeatable conformance tool."
+
 ## Milestone to Spec Map
 
 | Spec | Milestone | Primary Goal | Why This Is a Good Slice | Depends On |
@@ -39,6 +53,34 @@ The split keeps the same two rules:
 | `020-knowledge-ingestion-and-retrieval` | V2-A2 | Turn knowledge into a first-class local runtime layer through ingestion, indexing metadata, retrieval, and source visibility | Big enough to be a real milestone, but still focused on one product problem: making local knowledge usable and inspectable | 003, 006, 010, 018, 019 |
 | `021-workflow-graph-and-automation` | V2-A3 | Add workflow graph contracts, resumable execution, and first automation/task-flow support on top of tools, hooks, approvals, and knowledge retrieval | Keeps DAG/automation in one meaningful milestone instead of splitting graph contracts, runners, and automation into tiny specs | 004, 015, 018, 019, 020 |
 
+## Capability Inference Specs
+
+| Spec | Track | Primary Goal | Why This Is a Good Slice | Depends On |
+|---|---|---|---|---|
+| `023-capability-inference-read-tools` | V2-A4 | Route clear read/write intents to explicit capabilities instead of defaulting every freeform request to `generate.reply` | Provides the first real read-tool baseline, especially `calendar.read`, that `027` can safely expose through Hub Interop | 010, 015, 018, 019 |
+
+## Hub Interop Delivery Specs
+
+| Spec | Track | Primary Goal | Why This Is a Good Slice | Depends On |
+|---|---|---|---|---|
+| `024-shared-interop-contract` | V2-I1 | Extract the shared public Hub Interop protocol contract and Android binding into separately reusable modules | Makes the protocol independently consumable by Mobile Claw, external apps, and the probe app instead of leaving it host-bound | 015, 016, 017, 018 |
+| `025-mobileclaw-interop-host` | V2-I2 | Implement Mobile Claw as one governed host/provider of the shared Hub Interop protocol | Turns the docs-level contract into a real host implementation with governed discovery, authorization, invocation, task, and artifact behavior | 024 |
+| `026-interop-probe-app` | V2-I3 | Build a separate protocol consumer app that validates Hub Interop against Mobile Claw through the shared public contract only | Proves the protocol is externally consumable and catches host-specific leakage early | 024, 025 |
+
+## Hub Interop Public Baseline Specs
+
+| Spec | Track | Primary Goal | Why This Is a Good Slice | Depends On |
+|---|---|---|---|---|
+| `027-public-interop-contract-stabilization` | V2-I4 | Stabilize the public Hub Interop protocol contract, Android binding, status semantics, descriptors, compatibility behavior, and codec validation | Locks the contract before host hardening and conformance testing depend on it as a public API | 024, 025, 026 |
+| `028-mobileclaw-trusted-interop-host` | V2-I5 | Harden Mobile Claw as the trusted host with host-attested caller identity, authorization lifecycle, durable task/artifact semantics, and `generate.reply` + bounded `calendar.read` execution | Proves the Claw app can safely execute public interop requests through the governed runtime spine | 023, 025, 027 |
+| `029-interop-probe-conformance-suite` | V2-I6 | Upgrade the probe app into a repeatable conformance client with manual mode, conformance mode, spoof/authorization/task/artifact diagnostics, and shareable reports | Proves an independent app can validate protocol and host behavior without depending on `:app` internals | 026, 027, 028 |
+
+This replaces the earlier broader `027-032` split. Read expansion, control-center object detail, workflow runner, resource/knowledge exchange, and side-effect capability exposure stay deferred until the public protocol, trusted host, and conformance loop are stable.
+
+`028` should intentionally stay narrow on exposed capabilities: keep `generate.reply` for basic invocation and add `calendar.read` as the first real Android read capability. Do not include contacts, knowledge search, workflow run, calendar write/delete, message send, file read, or broader side-effect tools in this baseline.
+
+The detailed rationale for this split lives in [Hub Interop 027-029 Spec Split v1](./hub-interop-027-029-spec-split-v1.md).
+
 ## Recommended Build Order
 
 1. `007-external-runtime-entry`
@@ -56,6 +98,13 @@ The split keeps the same two rules:
 13. `019-runtime-hooks-and-context-sources`
 14. `020-knowledge-ingestion-and-retrieval`
 15. `021-workflow-graph-and-automation`
+16. `023-capability-inference-read-tools`
+17. `024-shared-interop-contract`
+18. `025-mobileclaw-interop-host`
+19. `026-interop-probe-app`
+20. `027-public-interop-contract-stabilization`
+21. `028-mobileclaw-trusted-interop-host`
+22. `029-interop-probe-conformance-suite`
 
 ## Why This Cut
 
@@ -112,18 +161,43 @@ Those concerns should stay grouped by product problem:
 - `020` makes local knowledge usable
 - `021` makes multi-step automation and DAG execution usable
 
+For the protocol track, it also avoids a fourth failure mode: treating the shared public contract, the Mobile Claw host implementation, and the independent consumer validation app as one umbrella milestone.
+Those three concerns should stay split because they answer different questions:
+
+- `024` proves the protocol is independently consumable
+- `025` proves Mobile Claw can implement it
+- `026` proves an external app can really use it
+- `027` proves the public contract is stable enough to depend on
+- `028` proves Mobile Claw can be a trusted governed host for that contract
+- `029` proves an independent probe can continuously validate the contract and host behavior
+
 ## Active Next Scope
 
-Recommended immediate next spec after the current completed line:
+Current priority implementation track:
+
+- `027-public-interop-contract-stabilization`
+
+Recently completed protocol track:
+
+- `024-shared-interop-contract`
+- `025-mobileclaw-interop-host`
+- `026-interop-probe-app`
+
+Relevant completed runtime/capability prerequisites:
 
 - `019-runtime-hooks-and-context-sources`
-
-Recommended follow-on specs right after that:
-
 - `020-knowledge-ingestion-and-retrieval`
 - `021-workflow-graph-and-automation`
+- `023-capability-inference-read-tools`
 
-Before or alongside `019`, a short `018.x` control-surface hardening pass is still reasonable as long as it stays inside the existing runtime-control-center track and does **not** become a new top-level spec.
+Recommended follow-on specs right after:
+
+- `028-mobileclaw-trusted-interop-host`
+- `029-interop-probe-conformance-suite`
+
+Parallel backlog:
+
+- `018.x` control-surface hardening inside the existing runtime-control-center track
 
 That hardening should stay focused on:
 
@@ -131,6 +205,31 @@ That hardening should stay focused on:
 - regrouping the control center into `Now / Capabilities / Policy / Knowledge / Automation`
 - a shared summary/detail template for core runtime objects
 - basic reversible extension management such as enable/disable, visibility, pinning, and default approval mode
+
+`027` acceptance should prove the public contract is stable:
+
+- public method families remain fixed to discovery, authorization, invocation, task, artifact, and revoke/status flows
+- status codes distinguish bad request, unauthorized, authorization required, pending, forbidden, not found, expired, incompatible, unsupported capability, provider unavailable, permission unavailable, policy denied, approval required/rejected, execution failed, and internal error where applicable
+- capability, grant, task, and artifact descriptors have stable v1 fields with host-internal details excluded
+- version compatibility handles supported, downgraded, incompatible, required unknown fields, optional unknown fields, and extension namespaces explicitly
+- request/response Bundle codecs have roundtrip tests in the public Android binding
+- `024/025` task checklists are reconciled with their implemented status
+
+`028` acceptance should prove Mobile Claw is a trusted governed host:
+
+- host-attested caller identity, grant lookup, task ownership, artifact access, and audit all use host-derived identity
+- spoofed caller metadata is display/diagnostic only
+- unauthorized, pending, granted, revoked, incompatible, downgraded, not-found, forbidden, and expired states are externally observable
+- accepted invocations create durable task/artifact records or explicitly documented lifecycle semantics
+- `generate.reply` remains available and bounded `calendar.read` is added as the first real Android read capability
+- calendar permission unavailable, empty result, bounded query, completed artifact, audit, revoke, and cross-caller access behavior are explicit
+
+`029` acceptance should prove the probe is a conformance tool:
+
+- third-party caller depends only on contract modules
+- manual mode covers discover, request authorization, refresh grant, invoke, poll task, load artifact, revoke, and export report
+- conformance mode covers compatibility, spoof diagnostics, unauthorized, pending, granted, revoked, task lifecycle, artifact lifecycle, malformed request, and downgrade/incompatible diagnostics
+- report output includes host package, authority, protocol version, supported methods, supported capabilities, pass/fail matrix, raw status codes, failure reason, and timeline
 
 ## Relationship to v0
 

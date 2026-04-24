@@ -47,6 +47,10 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -59,6 +63,9 @@ kapt {
 }
 
 dependencies {
+    implementation(project(":hub-interop-contract-core"))
+    implementation(project(":hub-interop-android-contract"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -90,6 +97,7 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
 
     kapt(libs.hilt.android.compiler)
     kapt(libs.androidx.room.compiler)

@@ -48,6 +48,7 @@ import com.mobileclaw.app.runtime.workflow.WorkflowCheckpointState
 import com.mobileclaw.app.runtime.workflow.WorkflowRunState
 import com.mobileclaw.app.runtime.workflow.WorkflowStepType
 import com.mobileclaw.app.runtime.workflow.WorkflowTriggerType
+import com.mobileclaw.interop.contract.InteropTaskStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -539,6 +540,17 @@ class AppStrings @Inject constructor(
         displayLabel: String,
         scopeLabel: String,
     ): String = get(R.string.governance_explanation_scope_ask, displayLabel, scopeLabel)
+
+    fun interopTaskStatusLabel(status: InteropTaskStatus): String = get(
+        when (status) {
+            InteropTaskStatus.PENDING -> R.string.interop_task_status_pending
+            InteropTaskStatus.RUNNING -> R.string.interop_task_status_running
+            InteropTaskStatus.INPUT_REQUIRED -> R.string.interop_task_status_input_required
+            InteropTaskStatus.COMPLETED -> R.string.interop_task_status_completed
+            InteropTaskStatus.FAILED -> R.string.interop_task_status_failed
+            InteropTaskStatus.CANCELLED -> R.string.interop_task_status_cancelled
+        },
+    )
 
     fun systemSourceLabel(sourceId: SystemSourceId): String = get(
         when (sourceId) {

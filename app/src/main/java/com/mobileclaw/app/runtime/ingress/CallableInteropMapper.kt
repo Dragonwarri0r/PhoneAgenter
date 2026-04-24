@@ -2,6 +2,7 @@ package com.mobileclaw.app.runtime.ingress
 
 import com.mobileclaw.app.R
 import com.mobileclaw.app.runtime.strings.AppStrings
+import com.mobileclaw.interop.contract.InteropIds
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -11,15 +12,15 @@ class CallableInteropMapper @Inject constructor(
 ) {
     val supportedSurfaces: List<CallableSurfaceDescriptor> = listOf(
         CallableSurfaceDescriptor(
-            surfaceId = "runtime.callable.basic",
+            surfaceId = InteropIds.Surface.RUNTIME_CALLABLE_BASIC,
             displayName = "Mobile Claw Runtime",
             supportedFields = listOf("userInput", "requestedCapabilityId", "requestedScopes", "attachments"),
             supportedScopes = listOf(
-                "reply.generate",
-                "calendar.read",
-                "calendar.write",
-                "message.send",
-                "external.share",
+                InteropIds.Scope.REPLY_GENERATE,
+                InteropIds.Scope.CALENDAR_READ,
+                InteropIds.Scope.CALENDAR_WRITE,
+                InteropIds.Scope.MESSAGE_SEND,
+                InteropIds.Scope.EXTERNAL_SHARE,
             ),
             supportsAttachments = true,
         ),

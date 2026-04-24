@@ -1,9 +1,12 @@
 # Feature Specification: Hub Interop Protocol And Federated Capability Exchange
 
-**Feature Branch**: `022-hub-interop-protocol`  
-**Created**: 2026-04-23  
-**Status**: Draft  
+**Feature Branch**: `022-hub-interop-protocol`
+**Created**: 2026-04-23
+**Status**: Superseded (Docs Baseline Only)
 **Input**: User description: "Analyze the roadmap and current codebase, then improve Mobile Claw's cross-app communication protocol by referencing MCP, A2A, and similar protocols. Mobile Claw should act as a managed local hub that can expose model-backed and internal capabilities to other apps, accept external capabilities into its own runtime, and govern those relationships through the existing management, policy, and memory framework."
+
+> Note: This exploratory spec is no longer the implementation milestone.
+> The agreed protocol work is now organized in docs under [Hub Interop Docs Index v1](/Users/youxuezhe/StudioProjects/mobile_claw/docs/hub-interop-docs-index-v1.md), and implementation starts from `024-shared-interop-contract`, `025-mobileclaw-interop-host`, and `026-interop-probe-app`.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -37,7 +40,37 @@ As a user or platform operator, I want Mobile Claw to accept external app capabi
 
 ---
 
-### User Story 3 - Coordinate Stateful Multi-Turn Or Long-Running Work Across App Boundaries (Priority: P3)
+### User Story 3 - Integrate Through A Stable Shared Public Protocol Contract (Priority: P1)
+
+As an Android app developer, I want a stable reusable public protocol contract that is isolated from any single host implementation, so I can integrate against supported discovery, invocation, authorization, task, and artifact semantics without reverse-engineering internal strings or linking against host-only implementation code.
+
+**Why this priority**: The first platform slice is Android, and the protocol is intended to be consumed by external apps directly. If the shared contract is not isolated from Mobile Claw, the protocol will collapse into host-specific internals before it becomes reusable.
+
+**Independent Test**: Build or describe a separate Android caller that uses the shared public protocol contract to discover Mobile Claw, invoke one governed capability, handle an authorization-required response, and continue without copying opaque implementation details from the host app.
+
+**Acceptance Scenarios**:
+
+1. **Given** an Android caller wants to integrate with Mobile Claw, **When** it uses the supported shared public protocol contract, **Then** it can construct requests, interpret responses, and route task or authorization handles without depending on host-internal runtime classes.
+2. **Given** the caller and Mobile Claw do not fully align on supported contract or platform capabilities, **When** the caller attempts discovery or invocation, **Then** compatibility limits are surfaced through explicit public signals instead of silent failure or undefined behavior.
+
+---
+
+### User Story 4 - Validate Interop Through A Separate Protocol Consumer App (Priority: P2)
+
+As a platform developer, I want a separate app to validate the shared protocol contract against Mobile Claw, so the protocol is proven through an external consumer path instead of only through host-internal tests or assumptions.
+
+**Why this priority**: The protocol only becomes real when a separate app can consume it without privileged access to Mobile Claw internals. This validation app is also the first guardrail against host-specific leakage in the public contract.
+
+**Independent Test**: Build or describe a separate protocol consumer app that depends only on the public protocol contract and Android binding layer, then verify it can complete discovery, authorization, governed invocation, and at least one task or artifact flow against Mobile Claw.
+
+**Acceptance Scenarios**:
+
+1. **Given** a separate protocol consumer app is installed alongside Mobile Claw, **When** it attempts to interact with Mobile Claw through the public contract, **Then** it can complete the supported interop flows without linking against Mobile Claw host-internal implementation classes.
+2. **Given** the public contract drifts away from the actual Mobile Claw implementation, **When** the validation app exercises supported flows, **Then** incompatibility is surfaced as explicit contract or compatibility failure rather than hidden runtime breakage.
+
+---
+
+### User Story 5 - Coordinate Stateful Multi-Turn Or Long-Running Work Across App Boundaries (Priority: P3)
 
 As a user, I want Mobile Claw to support stateful cross-app collaboration when work is too large for a single tool call, so other apps and future agent-like integrations can exchange task state, required follow-up input, progress, and artifacts without collapsing everything into one synchronous call.
 
@@ -60,6 +93,9 @@ As a user, I want Mobile Claw to support stateful cross-app collaboration when w
 - What happens when a long-running cross-app task is interrupted, requires follow-up input, or loses the external provider before completion?
 - What happens when Mobile Claw exposes or consumes capabilities that carry sensitive memory, knowledge, attachment, or URI-grant context and the receiving side has narrower trust guarantees?
 - What happens when two connected apps expose overlapping capabilities and Mobile Claw must choose, prioritize, or disable one without confusing the user?
+- What happens when an Android caller supports the shared public protocol contract but cannot use one preferred platform adapter path and must continue through the baseline transport without changing protocol semantics?
+- What happens when a caller upgrades its shared public protocol contract but the installed Mobile Claw host only supports an older protocol family version or narrower interaction set?
+- What happens when the separate probe app accidentally starts depending on Mobile Claw host-internal implementation classes and no longer represents a real external consumer?
 
 ## Requirements *(mandatory)*
 
@@ -81,6 +117,13 @@ As a user, I want Mobile Claw to support stateful cross-app collaboration when w
 - **FR-014**: User-facing labels and explanations for connected apps, callable capabilities, task state, compatibility, and trust outcomes MUST support English and Simplified Chinese automatically via device locale.
 - **FR-015**: This milestone MUST build on the existing runtime, governance, tool, extension, memory, knowledge, and control-center foundations rather than introducing a parallel execution stack.
 - **FR-016**: This milestone MUST treat the current share-based ingress as a compatibility path, not as the only long-term contract for governed cross-app capability exchange.
+- **FR-017**: The first Android-facing slice of the protocol family MUST define a stable public Android binding for discovery, governed invocation, authorization, task status, and resource or artifact handles while preserving transport-agnostic protocol semantics at the family level.
+- **FR-018**: The first Android-facing slice MUST isolate the shared protocol contract from any single host implementation so that Mobile Claw and external Android apps can both consume the same versioned public contract surface.
+- **FR-019**: Android integrators MUST be able to consume a versioned reusable shared public protocol contract that exposes supported identifiers, request or response semantics, handle semantics, and compatibility metadata without depending on Mobile Claw host-internal runtime implementation classes.
+- **FR-020**: Governed discovery, authorization, task, and artifact flows MUST remain available through an explicit baseline Android transport even when a preferred Android capability-invocation adapter path is unavailable, unsupported, or only partially available to a caller.
+- **FR-021**: The shared public protocol contract MUST remain narrower than the host implementation, separating stable protocol and binding contracts from host-only execution, governance, model-serving, persistence, and UI internals.
+- **FR-022**: The first Android slice MUST include a separate protocol consumer validation app that depends on the shared public protocol contract and exercises discovery, authorization, governed invocation, and at least one task or artifact flow against Mobile Claw.
+- **FR-023**: The separate protocol consumer validation app MUST NOT depend on Mobile Claw host-internal runtime implementation classes, repositories, UI internals, or governance implementation details.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -90,6 +133,8 @@ As a user, I want Mobile Claw to support stateful cross-app collaboration when w
 - **InteropTaskRecord**: Stateful cross-app task record describing submission, progress, input-required, completion, failure, or interruption across app boundaries.
 - **InteropArtifact**: Result payload produced by a cross-app task or invocation, such as text, file-like outputs, structured summaries, or other governed artifacts.
 - **CompatibilitySignal**: Versioning and feature-compatibility metadata used to explain whether two app surfaces can safely interoperate and what was downgraded when they cannot fully align.
+- **SharedPublicProtocolContract**: Versioned developer-consumable contract surface that is isolated from any single host implementation and exposes supported public identifiers, handle semantics, request or response shapes, and compatibility metadata without exposing host-only implementation internals.
+- **InteropProbeApp**: Separate protocol consumer app used to validate that the shared public protocol contract interoperates with Mobile Claw through real external app flows rather than host-internal shortcuts.
 
 ## Success Criteria *(mandatory)*
 
@@ -99,6 +144,8 @@ As a user, I want Mobile Claw to support stateful cross-app collaboration when w
 - **SC-002**: At least one external app surface can be represented inside Mobile Claw as a managed connected capability provider or peer with visible trust and compatibility state.
 - **SC-003**: The protocol family can represent both short-lived callable interactions and stateful task-oriented interactions without collapsing them into the same request shape.
 - **SC-004**: Users can inspect connected app trust, compatibility, and recent interaction state through the existing governed control model rather than through hidden debug-only flows.
+- **SC-005**: Mobile Claw and at least one separate Android caller can both consume the same shared public protocol contract without manually copying opaque host implementation constants.
+- **SC-006**: A separate protocol consumer app can complete at least one governed integration flow against Mobile Claw without linking against host-internal execution classes.
 
 ## Assumptions
 
@@ -106,3 +153,4 @@ As a user, I want Mobile Claw to support stateful cross-app collaboration when w
 - Existing tool descriptors, governance records, runtime contribution contracts, knowledge management, and runtime control surfaces remain the foundation for protocol governance and explainability.
 - The first protocol-hardening slice should establish the contract family and managed connected-app model before a dedicated validation app or broader ecosystem rollout.
 - Short-lived callable capability exchange and longer-running task collaboration should share one protocol family but remain distinct interaction shapes.
+- The first Android caller-facing shared protocol contract must be separately versioned and isolated from host implementation, even if the exact packaging and publication mechanics evolve during planning.

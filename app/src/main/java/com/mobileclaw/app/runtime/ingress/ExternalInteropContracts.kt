@@ -1,63 +1,22 @@
 package com.mobileclaw.app.runtime.ingress
 
 import com.mobileclaw.app.runtime.multimodal.PendingAttachment
+import com.mobileclaw.interop.contract.CallerContractIdentity as SharedCallerContractIdentity
+import com.mobileclaw.interop.contract.CallableSurfaceDescriptor as SharedCallableSurfaceDescriptor
+import com.mobileclaw.interop.contract.ExternalTrustState as SharedExternalTrustState
+import com.mobileclaw.interop.contract.InteropCompatibilitySignal as SharedInteropCompatibilitySignal
+import com.mobileclaw.interop.contract.InteropEntryType as SharedInteropEntryType
+import com.mobileclaw.interop.contract.InteropVersion
+import com.mobileclaw.interop.contract.UriGrantMode as SharedUriGrantMode
+import com.mobileclaw.interop.contract.UriGrantSummary as SharedUriGrantSummary
 
-private const val DEFAULT_INTEROP_VERSION = "1.0"
-
-enum class ExternalTrustState {
-    TRUSTED,
-    UNVERIFIED,
-    DENIED,
-}
-
-enum class InteropEntryType {
-    SHARE_HANDOFF,
-    CALLABLE_REQUEST,
-}
-
-enum class UriGrantMode {
-    NONE,
-    READ_ONLY,
-    WRITE_CAPABLE,
-    MIXED,
-    UNKNOWN,
-}
-
-data class CallerContractIdentity(
-    val originApp: String,
-    val packageName: String? = null,
-    val sourceLabel: String,
-    val trustState: ExternalTrustState,
-    val trustReason: String,
-    val referrerUri: String? = null,
-    val signatureDigest: String? = null,
-    val contractVersion: String = DEFAULT_INTEROP_VERSION,
-)
-
-data class UriGrantSummary(
-    val grantCount: Int,
-    val grantedMimeFamilies: List<String>,
-    val grantMode: UriGrantMode,
-    val expiresWithSession: Boolean,
-    val summaryText: String,
-) {
-    companion object {
-        fun none(summaryText: String) = UriGrantSummary(
-            grantCount = 0,
-            grantedMimeFamilies = emptyList(),
-            grantMode = UriGrantMode.NONE,
-            expiresWithSession = false,
-            summaryText = summaryText,
-        )
-    }
-}
-
-data class InteropCompatibilitySignal(
-    val interopVersion: String = DEFAULT_INTEROP_VERSION,
-    val isCompatible: Boolean = true,
-    val compatibilityReason: String,
-    val unknownFieldCount: Int = 0,
-)
+typealias ExternalTrustState = SharedExternalTrustState
+typealias InteropEntryType = SharedInteropEntryType
+typealias UriGrantMode = SharedUriGrantMode
+typealias CallerContractIdentity = SharedCallerContractIdentity
+typealias UriGrantSummary = SharedUriGrantSummary
+typealias InteropCompatibilitySignal = SharedInteropCompatibilitySignal
+typealias CallableSurfaceDescriptor = SharedCallableSurfaceDescriptor
 
 data class InteropRequestEnvelope(
     val interopRequestId: String,
@@ -74,15 +33,6 @@ data class InteropRequestEnvelope(
     val rawSourceSummary: String = "",
 )
 
-data class CallableSurfaceDescriptor(
-    val surfaceId: String,
-    val displayName: String,
-    val supportedFields: List<String>,
-    val supportedScopes: List<String>,
-    val supportsAttachments: Boolean,
-    val interopVersion: String = DEFAULT_INTEROP_VERSION,
-)
-
 data class CallableRequestPayload(
     val requestId: String,
     val surfaceId: String,
@@ -92,5 +42,5 @@ data class CallableRequestPayload(
     val requestedScopes: List<String> = emptyList(),
     val requestedCapabilityId: String? = null,
     val unknownFieldCount: Int = 0,
-    val contractVersion: String = DEFAULT_INTEROP_VERSION,
+    val contractVersion: String = InteropVersion.CURRENT.value,
 )

@@ -16,4 +16,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "mobile_claw"
 include(":app")
-
+include(":hub-interop-contract-core")
+include(":hub-interop-android-contract")
+include(":interop-probe-app")

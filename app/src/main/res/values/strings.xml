@@ -953,4 +953,24 @@
     <string name="runtime_contribution_scope_mutation_capabilities">Mutation capabilities: %1$s</string>
     <string name="runtime_contribution_read_provider_note">Provides governed bounded read access through the shared capability surface.</string>
     <string name="runtime_contribution_mutation_provider_note">Provides governed auditable device writes through the shared capability surface.</string>
+    <string name="runtime_control_artifact_interop_host">Interop Host</string>
+    <string name="runtime_control_interop_idle">No cross-app interop host runs yet.</string>
+    <string name="runtime_control_interop_task_count">%1$d recent interop host run(s)</string>
+    <string name="interop_task_status_pending">Pending</string>
+    <string name="interop_task_status_running">Running</string>
+    <string name="interop_task_status_input_required">Awaiting input</string>
+    <string name="interop_task_status_completed">Completed</string>
+    <string name="interop_task_status_failed">Failed</string>
+    <string name="interop_task_status_cancelled">Cancelled</string>
+    <string name="hub_interop_surface_display_name">Mobile Claw Hub</string>
+    <string name="hub_interop_surface_summary">Governed Mobile Claw runtime surface for cross-app capability discovery and invocation.</string>
+    <string name="hub_interop_task_queued">%1$s request queued for execution.</string>
+    <string name="hub_interop_authorization_required_message">This capability is not yet available to external callers without an authorization flow.</string>
+    <string name="hub_interop_authorization_not_implemented">Authorization management for this host surface is not implemented yet.</string>
+    <string name="hub_interop_authorization_requested">Authorization requested for %1$s.</string>
+    <string name="hub_interop_authorization_required">Open Mobile Claw Governance Center and approve %1$s for %2$s before invoking this capability.</string>
+    <string name="hub_interop_authorization_pending">Authorization for %1$s is pending in Mobile Claw Governance Center for %2$s.</string>
+    <string name="hub_interop_authorization_granted">Authorization for %1$s is active.</string>
+    <string name="hub_interop_authorization_denied">Authorization for %1$s is denied.</string>
+    <string name="hub_interop_authorization_revoked">Authorization for %1$s was revoked.</string>
 </resources>

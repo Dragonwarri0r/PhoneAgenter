@@ -6,6 +6,13 @@ import kotlinx.coroutines.flow.Flow
 interface GovernanceRepository {
     fun observeGovernanceCenter(limit: Int = 8): Flow<GovernanceCenterSnapshot>
 
+    suspend fun getCallerRecord(callerId: String): CallerGovernanceRecord?
+
+    suspend fun getScopeGrant(
+        callerId: String,
+        scopeId: String,
+    ): ScopeGrantRecord?
+
     suspend fun recordCallerObservation(
         callerIdentity: CallerIdentity,
         displayLabel: String,

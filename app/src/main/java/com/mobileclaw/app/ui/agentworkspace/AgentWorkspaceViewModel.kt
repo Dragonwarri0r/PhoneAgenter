@@ -21,6 +21,7 @@ import com.mobileclaw.app.runtime.knowledge.ManagedKnowledgeService
 import com.mobileclaw.app.runtime.ingress.ExternalHandoffCoordinator
 import com.mobileclaw.app.runtime.ingress.ExternalHandoffEvent
 import com.mobileclaw.app.runtime.ingress.ExternalRuntimeRequestMapper
+import com.mobileclaw.app.runtime.interop.HubInteropTaskService
 import com.mobileclaw.app.runtime.localchat.LocalModelCatalog
 import com.mobileclaw.app.runtime.localchat.LocalModelProfile
 import com.mobileclaw.app.runtime.localchat.ModelAvailabilityStatus
@@ -129,6 +130,7 @@ class AgentWorkspaceViewModel @Inject constructor(
     private val portabilityBundleFormatter: PortabilityBundleFormatter,
     private val portabilityBundleShareService: PortabilityBundleShareService,
     private val governanceRepository: GovernanceRepository,
+    private val hubInteropTaskService: HubInteropTaskService,
     private val systemSourceRepository: SystemSourceRepository,
     private val managedKnowledgeService: ManagedKnowledgeService,
     private val managedWorkflowService: ManagedWorkflowService,
@@ -150,6 +152,7 @@ class AgentWorkspaceViewModel @Inject constructor(
     private var contextInspectorJob: Job? = null
     private var externalHandoffJob: Job? = null
     private var governanceJob: Job? = null
+    private var interopTaskJob: Job? = null
     private var systemSourceJob: Job? = null
     private var knowledgeJob: Job? = null
     private var automationJob: Job? = null
@@ -159,6 +162,7 @@ class AgentWorkspaceViewModel @Inject constructor(
         observeContextInspector()
         observeExternalHandoffs()
         observeGovernanceCenter()
+        observeInteropTasks()
         observeSystemSources()
         observeKnowledgeArea()
         observeAutomationArea()
@@ -836,6 +840,17 @@ class AgentWorkspaceViewModel @Inject constructor(
                         },
                         contributors = _uiState.value.governanceCenter.contributors,
                     ),
+                )
+            }
+        }
+    }
+
+    private fun observeInteropTasks() {
+        interopTaskJob?.cancel()
+        interopTaskJob = viewModelScope.launch {
+            hubInteropTaskService.recentTasks.collectLatest { tasks ->
+                _uiState.value = _uiState.value.copy(
+                    interopTasks = tasks,
                 )
             }
         }
@@ -3055,6 +3070,30 @@ class AgentWorkspaceViewModel @Inject constructor(
                         R.string.workspace_secondary_governance_summary,
                         state.governanceCenter.callers.size,
                     )
+                },
+                actionLabel = appStrings.get(R.string.runtime_control_action_open_governance),
+                isEditable = true,
+            ),
+            ManagedArtifactEntryUiModel(
+                artifactId = "interop_host",
+                title = appStrings.get(R.string.runtime_control_artifact_interop_host),
+                summary = state.interopTasks.firstOrNull()?.summary
+                    ?.takeIf { it.isNotBlank() }
+                    ?: appStrings.get(R.string.runtime_control_interop_idle),
+                statusLine = if (state.interopTasks.isEmpty()) {
+                    appStrings.get(R.string.runtime_control_state_inspect_only)
+                } else {
+                    appStrings.get(
+                        R.string.runtime_control_interop_task_count,
+                        state.interopTasks.size,
+                    )
+                },
+                detailLines = state.interopTasks.take(3).map { task ->
+                    listOf(
+                        task.displayName,
+                        appStrings.interopTaskStatusLabel(task.status),
+                        task.summary.takeIf { it.isNotBlank() },
+                    ).filterNotNull().joinToString(separator = " · ")
                 },
                 actionLabel = appStrings.get(R.string.runtime_control_action_open_governance),
                 isEditable = true,

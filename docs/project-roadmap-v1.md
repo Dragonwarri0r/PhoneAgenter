@@ -40,6 +40,51 @@
 - 用户可以在 app 内看懂系统用了什么、为什么这样做、哪里被允许或拒绝
 - 用户可以在 app 内直接管理支持编辑的运行时对象，而不是到处分散找入口
 
+### 2.1 Hub Interop 之后的产品定义
+
+在 `024-026` 之后，Mobile Claw 不应该再被描述成“一个带 interop 的 app”。
+
+更准确的产品定义是三件东西：
+
+1. `Hub Interop Protocol`
+开放给其他 app 接入的公共协议 / SDK / contract。它定义 discovery、authorization、capability invocation、task polling、artifact loading、compatibility diagnostics 等外部调用语义。
+
+2. `Mobile Claw Host`
+实现协议的执行中枢。它负责 host-attested caller identity、governance、scope grant、policy、approval、runtime routing、provider execution、audit、control center。
+
+3. `Interop Probe App`
+协议测试端和 conformance client。它不是 demo app，而是用来证明协议和 host 行为真的能被一个完全独立的外部 app 使用。
+
+对应的系统链路应固定为：
+
+```text
+Third-party App / Probe App
+        ↓
+Hub Interop Android Contract
+        ↓
+Mobile Claw HubInteropProvider
+        ↓
+Authorization / Governance / Policy / Approval
+        ↓
+Runtime Session Orchestrator
+        ↓
+Capability Router
+        ↓
+Provider Execution
+        ↓
+Task / Artifact / Audit / Control Center
+```
+
+这里的边界很重要：
+
+- 协议层不执行能力，只定义外部 caller 如何发现、授权、调用、轮询 task、读取 artifact、处理兼容性。
+- Mobile Claw Host 才执行能力，它是 runtime、policy engine、用户治理中心和审计面。
+- Probe app 不验证“按钮能不能点”，而验证协议行为是否符合 contract。
+
+因此下一阶段重心应从“继续增加 app 功能”调整为：
+
+> 把协议变成稳定公共入口，把 Claw app 变成可信 host，把 probe app 变成协议一致性测试工具。
+
 ## 3. v1 的四个产品支柱
 
 ### 3.1 Conversation-First Control Surface
@@ -68,6 +113,16 @@ runtime core 需要像 OpenClaw 一样成为真正的分发核心，而不是单
 - unified extension registration / compatibility / enablement
 - 避免每增加一个入口或扩展点就长出新的特例路径
 
+这条支柱的 docs-level 上游设计已经单独冻结在 [Hub Interop Protocol Design v1](./hub-interop-protocol-design-v1.md)。
+
+从 roadmap 视角，后续 interop 不再等同于“把 share 入口做得更完整”，而是要收口成一个 hub-grade interop family：
+
+- `share ingress` 只保留兼容型 handoff 角色
+- `callable capability` 承担显式能力调用
+- `resource / context exchange` 承担受控上下文与 artifact 交换
+- `task collaboration` 承担长任务与状态化协作
+- `governance plane` 统一入权限、出权限、approval 与 audit
+
 ### 3.4 Local Context And Portable Results
 
 产品不是只会执行动作，还要会解释上下文和带走结果。
@@ -86,6 +141,8 @@ runtime core 需要像 OpenClaw 一样成为真正的分发核心，而不是单
 - 请求进入同一条 runtime 主链路
 
 这条路径定义了：`真实入口`
+
+但它只是兼容入口，不是完整的 hub interop protocol。
 
 ### Flow B：把输入推进成可执行、可治理的动作
 
@@ -127,29 +184,55 @@ runtime core 需要像 OpenClaw 一样成为真正的分发核心，而不是单
 
 但这些能力现在仍然更像“已经存在的一组产品面”，还不是“已经收束成一个统一控制面”。
 
-### 下一阶段：Contract Hardening
+### 已落地：Contract / Control / Interop First Pass
 
-当前最应该继续推进的是两张合同型 spec：
+`016-018` 已经把 external caller、extension surface、runtime control center 推进到了第一版产品收口。
 
-- `016-external-caller-interop-contracts`
-- `017-unified-extension-surface`
+`024-026` 又把 Hub Interop 从 docs-level 设计推进成了真实模块和真实外部验证路径：
 
-这两张 spec 的目标不是继续堆功能，而是先把外部调用与内部扩展的边界固定下来。
+- `:hub-interop-contract-core`
+- `:hub-interop-android-contract`
+- `:app` 内的 `HubInteropProvider` host implementation
+- `:interop-probe-app`
 
-### 紧接着：Runtime Control Consolidation
+这说明第一条公共协议链路已经能跑通，但还不能直接把它当成长期开放边界。
 
-在 `016` 和 `017` 之后，需要补上一张真正的产品收口 spec：
+当前最重要的新增 spec 应拆成三张，而不是继续把协议、Host 和 Probe 都塞进一张：
 
-- `018-runtime-control-center`
+- `027-public-interop-contract-stabilization`
+- `028-mobileclaw-trusted-interop-host`
+- `029-interop-probe-conformance-suite`
 
-它解决的不是“再加一个管理页面”，而是把已经存在的 runtime / memory / approval / tool / extension 能力收束成一个 app 内可读、可编辑、可治理的控制面，同时保持多模态聊天仍然是主入口。
+这三张的目标不是扩功能，而是把 `024-026` 从“能跑通”硬化到“第三方 app 可以依赖”。
+
+### 当前主线：Public Interop Baseline
+
+`027-029` 对应三件产品边界：
+
+1. `027-public-interop-contract-stabilization`
+稳定 public method、status code、request/response schema、capability / grant / task / artifact descriptor、version compatibility、unknown field policy、Bundle codec roundtrip test。
+
+2. `028-mobileclaw-trusted-interop-host`
+引入 host-attested caller identity、caller fingerprint、signature digest host computation、authorization request lifecycle、durable task/artifact record、ownership checks、audit enrichment，并把 `generate.reply` + bounded `calendar.read` 跑进统一 runtime spine。
+
+3. `029-interop-probe-conformance-suite`
+把 probe app 从手动调试工具升级成 conformance client，覆盖 discovery、authorization lifecycle、spoof diagnostic、unauthorized / pending / granted / revoked invocation、task polling、artifact loading、downgrade / incompatible diagnostics、report export。
+
+`028` 只应暴露两个 capability：
+
+- `generate.reply`：证明基本 invocation 链路。
+- `calendar.read`：证明 Claw Host 可以通过真实 Android Calendar Provider 完成低风险 read capability，并覆盖权限缺失、bounded query、空结果、artifact、audit。
+
+`027-029` 不应包含大量新 capability、workflow runner、knowledge exchange、side-effect tools interop exposure，或完整 visual control center 重构。
+
+详细拆解见 [Hub Interop 027-029 Spec Split v1](./hub-interop-027-029-spec-split-v1.md)。
 
 ## 6. 现在仍然缺的产品收口
 
-从当前完成度看，最明显的缺口已经不是 `007-015` 当初定义的那些基础能力，而是下面五个收口问题：
+从当前完成度看，最明显的缺口已经不是 `007-015` 当初定义的那些基础能力，而是下面这些收口问题：
 
 1. `external interop 仍然偏入口导向`
-现有外部入口已经存在，但 caller identity、grant、callable surface 还没有完全稳定成统一 interop family。
+现有外部入口已经存在，但 caller identity、grant、callable surface、connected app relationship、task-style collaboration 还没有完全稳定成统一 interop family；这部分现在以上游协议文档为收口基线，而不再以 `ACTION_SEND` 本身为主定义。
 
 2. `extension 还是 hook-first，不是 system-first`
 `006` 和现有能力已经证明扩展方向成立，但统一 registration / compatibility / enablement 还没有封口。
@@ -163,9 +246,22 @@ memory、governance、approval、tool、extension 各自有自己的入口或半
 5. `explainability 仍然分片`
 来源、工具、批准、上下文、扩展贡献都已经部分可见，但还没有形成稳定、连续、可回看的 runtime trace。
 
-## 7. 018 之后的主线
+6. `共享公共协议层已经立住第一条可验证主线，但还没有成为稳定公共入口`
+`024-026` 已经把 docs-level Hub Interop Protocol、Android IPC 与模块边界落成了真实模块、host implementation 与独立 probe app，因此“协议是否能被外部 app 真正消费”这件事已经有了第一条可验证闭环。当前剩下的不是从零到一，而是按 `027` public protocol、`028` trusted host、`029` probe conformance 三步把边界硬化。
 
-`016-018` 完成之后，下一段主线不应该继续按“一个小扩展点一个 spec”去拆。
+7. `host 信任边界还不能依赖 request payload`
+下一步必须把 grant lookup、task ownership、artifact access、audit identity 都切到 host-attested caller identity。Bundle 里的 caller metadata 只能用于 display、diagnostics 和 mismatch warning，不能作为可信身份。
+
+8. `task / artifact handle 需要公共协议级生命周期语义`
+如果 task/artifact 仍只存在内存里，外部 caller 在 host 进程重启后会得到不可解释的 not found。`027` 先定义公共生命周期语义，`028` 再落 host durable record 或明确区分 available、expired、deleted、not_found、forbidden。
+
+## 7. Runtime Expansion Track (`019-021`)
+
+`019-021` 描述的是 runtime hooks、knowledge、workflow 这条横向能力扩展轨道。
+
+在 `027-029` 的 interop 重新定位之后，这条轨道仍然重要，但不再是当前唯一“下一步主线”。它应作为 host execution spine 的内部能力继续演进，而公共协议开放的优先级要先由 `027-public-interop-contract-stabilization`、`028-mobileclaw-trusted-interop-host`、`029-interop-probe-conformance-suite` 接住。
+
+这条轨道也不应该继续按“一个小扩展点一个 spec”去拆。
 
 如果我们后面希望参考 OpenClaw、Claude Code hooks 这类能力，并逐步接入：
 
@@ -254,11 +350,205 @@ memory、governance、approval、tool、extension 各自有自己的入口或半
 
 ### 7.4 Spec 拆分原则
 
-从 `019` 开始，拆分建议固定成这三个规则：
+对这条 runtime expansion 轨道，拆分建议固定成这三个规则：
 
 1. 一个 spec 要能完成一个真实里程碑，不只是一层抽象合同
 2. 一个 spec 可以覆盖一组强相关能力，但不要跨越两个不同产品问题
 3. 不再因为一个小入口、一个小 connector、一个小 hook 类型就单独起一张 spec
+
+## 8. Hub Interop Delivery Track
+
+在当前协议边界下，Hub Interop 的真正实现不再继续沿用 `022` 这张探索性 spec。
+
+这一条现在是当前明确启动的 interop 实施主线。
+
+`022` 保留 docs-level 聚合与问题收口的意义，但真正实现从 `024` 开始，拆成三张 spec：
+
+### 8.1 `024-shared-interop-contract`
+
+目标：
+
+- 把协议本体做成与 host 实现隔离的共享公共 contract
+- 把 Android `v1` binding 做成外部 app 可直接引用的 contract 层
+
+为什么单独成一张：
+
+- 如果没有独立公共协议模块，后面的 host 和 probe app 都会重新长出 host-specific 依赖
+- 这张 spec 回答的是“协议本体是否真正独立成立”
+
+当前已落地的首批 contract slice：
+
+- `:hub-interop-contract-core` 已作为共享协议语义核心落地
+- `:hub-interop-android-contract` 已作为 Android `v1` binding contract 落地
+- `HubInteropCaller`、public Bundle codec、status / compatibility adapter 已对外部 caller 可用
+- `:app` 与 `:interop-probe-app` 均已通过同一套公共 contract 接入，而不是复制 host 内部常量
+
+### 8.2 `025-mobileclaw-interop-host`
+
+目标：
+
+- 让 Mobile Claw 成为共享协议的实现者之一
+- 提供 governed discovery、authorization、invoke、task、artifact 等首批互通能力
+
+为什么单独成一张：
+
+- 这张 spec 回答的是“Mobile Claw 能不能正确实现协议”
+- 它不应和公共协议模块的边界设计混在一起
+
+当前已落地的首批 host slice：
+
+- 导出的 `HubInteropProvider` 已作为 Android `v1` 基线 transport 接入
+- `discover_surface`、`invoke_capability`、`request/get/revoke authorization`、`get_task`、`get_artifact` 已接入共享 contract
+- `generate.reply` 已通过统一治理模型要求 inbound grant，而不再默认无授权放行
+- 现有 governance center 与 runtime control center 已能看到 `reply.generate` grant 和最近 interop host task 摘要
+
+### 8.3 `026-interop-probe-app`
+
+目标：
+
+- 建立独立协议消费者 app
+- 只通过共享公共协议模块与 Mobile Claw 互通
+
+为什么单独成一张：
+
+- 这张 spec 回答的是“外部 app 能不能真的用起来”
+- 它是对协议与 host 实现的外部验证，而不是 host 内部测试
+
+当前已落地的首批 probe slice：
+
+- `:interop-probe-app` 已作为独立 Android app 模块接入
+- probe app 只依赖共享公共 contract，不依赖 `:app` 实现类
+- 已验证 discovery、authorization request / refresh / revoke、governed invocation、task continuation、artifact lookup
+- 已通过固定 minor / major 版本探测显式暴露 downgrade 与 incompatible 信号
+
+### 8.4 `027-public-interop-contract-stabilization`
+
+目标：
+
+- 把 Hub Interop 公共协议从“能跑通”升级成“第三方 app 可以依赖的 contract”
+- 稳定 public method、status code、Bundle schema、descriptor v1、compatibility behavior、unknown field policy
+- 清理 `024/025` tasks checkbox 与实现状态不一致的问题
+
+这一张 spec 的验收重点不是执行能力，而是 contract 稳定性：
+
+- 固定公开 method：`discover_surface`、`request_authorization`、`get_grant_status`、`revoke_grant`、`invoke_capability`、`get_task`、`get_artifact`
+- 明确 status code 语义，尤其区分 `UNAUTHORIZED`、`AUTHORIZATION_REQUIRED`、`PENDING`、`FORBIDDEN`、`NOT_FOUND`、`EXPIRED`
+- 稳定 capability / grant / task / artifact descriptor v1
+- 明确 version compatibility：major mismatch、minor newer、patch newer、required unknown field、optional unknown field、extension namespace
+- public Bundle codec 有 roundtrip tests
+- contract modules 继续不依赖 `:app`、Room、Hilt、Compose、policy engine 或具体 provider implementation
+
+`027` 不做：
+
+- host-attested identity implementation
+- Room-backed task/artifact persistence
+- probe conformance runner
+- 新 capability 暴露
+- control center UI
+
+### 8.5 `028-mobileclaw-trusted-interop-host`
+
+目标：
+
+- 把 Mobile Claw Host 从“协议实现者”硬化成可信执行中枢
+- 引入 host-attested caller identity 和 caller fingerprint
+- 让 authorization、task ownership、artifact access、audit identity 都使用 host-derived identity
+- 把 `generate.reply` 和 bounded `calendar.read` 作为首批公开可执行 capability
+
+这一张 spec 的真实验收链路应该是：
+
+```text
+Probe App
+  -> discover Mobile Claw Host
+  -> request calendar.read grant
+  -> Mobile Claw shows inbound grant request
+  -> user approves
+  -> Probe invokes bounded calendar.read
+  -> Claw Host creates durable interop task
+  -> runtime session executes calendar.read
+  -> task completes
+  -> artifact descriptor becomes available
+  -> Probe loads artifact
+  -> Mobile Claw audit/control center shows invocation
+  -> user revokes grant
+  -> Probe invocation fails after revoke
+```
+
+`028` 的主要范围：
+
+- `HostAttestedCallerIdentity`
+- claimed caller metadata 降级为 display / diagnostics
+- grant request lifecycle record
+- reuse `CallerGovernanceRecord` / `ScopeGrantRecord` as authorization truth
+- durable `InteropTaskRecord` / `InteropArtifactRecord` 或明确 lifecycle semantics
+- `get_task` / `get_artifact` ownership check
+- `generate.reply` baseline
+- bounded `calendar.read` baseline
+- permission unavailable / provider unavailable explicit status
+- audit enrichment and minimal control-center visibility
+
+`028` 暴露的 capability 应限制为：
+
+- `generate.reply`
+- `calendar.read`
+
+`calendar.read` 的价值在于它已经接入真实 Android Calendar Provider，能验证本地数据读取、权限缺失、bounded query、无结果、artifact、audit。它比 `contacts.read` 更成熟，比 `knowledge.search` 更容易收敛，也比 `calendar.write/delete` 风险低。
+
+`028` 不做：
+
+- 大量新 capability
+- workflow runner
+- knowledge / resource exchange
+- side-effect tools interop exposure
+- 完整 visual control center 重构
+
+### 8.6 `029-interop-probe-conformance-suite`
+
+目标：
+
+- 把 probe app 从“手动测试 app”升级成协议一致性测试工具
+- 证明一个完全独立的 app 可以持续验证 protocol 和 host 行为
+- 形成可分享、可回归、可用于开放协议的 conformance report
+
+`029` 应有两个模式：
+
+1. `Manual mode`
+用于人工调试：Discover、Request Authorization、Refresh Grant、Invoke、Poll Task、Load Artifact、Revoke、Export Report。
+
+2. `Conformance mode`
+一键跑测试：protocol compatibility、authorization lifecycle、caller identity mismatch、unauthorized invoke、pending grant invoke、granted invoke、revoked invoke、task lifecycle、artifact lifecycle、downgraded version、incompatible version、malformed request。
+
+报告应输出：
+
+- host package
+- host authority
+- protocol version
+- supported methods
+- supported capabilities
+- test matrix
+- pass/fail
+- failure reason
+- raw status codes
+- timeline
+
+`029` 不做：
+
+- 变成完整第三方 client 产品
+- 依赖 `:app`
+- 修复 host 行为本身
+- 新增未在 `027/028` 稳定过的协议能力
+
+### 8.7 `030+` 后续候选
+
+`029` 跑稳之后，后续路线先不固定成 `030-032`，但候选仍是：
+
+- expanded read capability protocol
+- host control center object details
+- workflow capability runner
+- resource and knowledge exchange
+- side-effect capability protocol
+
+这些不应该压进 `027-029`，否则会把公共协议、安全、治理、测试闭环和新功能一起放大。
 
 也就是说，后面优先避免这种拆法：
 
@@ -270,7 +560,7 @@ memory、governance、approval、tool、extension 各自有自己的入口或半
 
 `012-real-appfunctions-integration` 现在已经完成，因此它不再是后续主线的阻塞项，而是已落地的 Android 对齐能力。
 
-## 8. 新增横向轨道：Runtime Control Center
+## 9. Runtime Control Center Track
 
 目标：
 把 app 收束成一个真正的 `conversation-first runtime control center`。
@@ -293,7 +583,7 @@ memory、governance、approval、tool、extension 各自有自己的入口或半
 - 支持编辑的运行时对象可以在 app 内直接管理
 - 页面仍然保持可读、可用、不会因为能力增长而持续失控
 
-### 8.1 产品界面总原则
+### 9.1 产品界面总原则
 
 这一段之后，产品界面应固定成一句总原则：
 
@@ -305,7 +595,7 @@ memory、governance、approval、tool、extension 各自有自己的入口或半
 - control center 负责全局能力、治理与状态，不变成第二个工作区
 - detail page 负责单个对象的完整真相，不把对象语义拆散到多个零碎面板
 
-### 8.2 界面分层
+### 9.2 界面分层
 
 从 `018` 开始，建议把主产品面固定成五层，而不是继续让 runtime 信息自然扩散：
 
@@ -399,7 +689,7 @@ memory、governance、approval、tool、extension 各自有自己的入口或半
 - import / export debug
 - retry / recover / orphan cleanup
 
-### 8.3 功能分级
+### 9.3 功能分级
 
 除了界面分层，还要固定功能分级。建议以后按 `风险 + 可逆性 + 用户负担` 分成四级常规能力和一级高级能力。
 
@@ -469,7 +759,7 @@ memory、governance、approval、tool、extension 各自有自己的入口或半
 - 修改 provider schema
 - 进入高级诊断
 
-### 8.4 统一对象流转
+### 9.4 统一对象流转
 
 后续功能衔接应尽量统一成一条固定链路：
 
@@ -486,7 +776,7 @@ memory、governance、approval、tool、extension 各自有自己的入口或半
 
 这条链路的意义是：继续保持 conversation-first，但不让系统在后台“默默做完再回来报一句 done”。
 
-### 8.5 统一对象视图合同
+### 9.5 统一对象视图合同
 
 重要对象应尽量固定成两种主视图，而不是在五个地方各长一套 UI：
 
@@ -515,7 +805,7 @@ detail view 负责回答：
 - 是否进入 export
 - 是否需要 redaction preview
 
-### 8.6 `018.x` 的近端收口
+### 9.6 `018.x` 的近端收口
 
 在 `018` 完成之后，建议先允许一段不单独起顶层 spec 的 control-surface hardening。
 
@@ -559,9 +849,9 @@ detail view 负责回答：
 
 这部分的原则是：先把 extension 做到“可管理”，再把它做成“可编排”。
 
-## 8.7 下一段新增轨道：Hooks / Knowledge / Workflow
+## 10. 后续横向轨道：Hooks / Knowledge / Workflow
 
-这条轨道是 `018` 以及其近端 control-surface hardening 之后最自然的产品扩展方向。
+这条轨道是 `018` 以及其近端 control-surface hardening 之后最自然的产品扩展方向，但在当前 interop 重新定义下，它应排在 `027-029` 的 public protocol、trusted host、probe conformance 闭环之后继续推进。
 
 它解决的不是“再多接几个工具”，而是：
 
@@ -577,7 +867,7 @@ detail view 负责回答：
 
 当这三张完成后，Mobile Claw 才会真正从“可治理的 agent app”进入“可扩展、可组合、可编排的本地 agent runtime”。
 
-## 9. v1 完成态
+## 11. v1 完成态
 
 当下面这些成立时，可以认为 `v1` 真正成立：
 
@@ -595,7 +885,7 @@ detail view 负责回答：
 
 到那时，Mobile Claw 才算真正从“可运行的 Agent Runtime”进入“可使用、可治理、可扩展的 Android 个人 Agent 产品”。
 
-## 10. 019-021 的完成态
+## 12. 019-021 的完成态
 
 当下面这些成立时，可以认为下一段 roadmap 成立：
 
