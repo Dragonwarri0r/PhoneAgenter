@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Hub Interop Protocol And Federated Capability Exchange
+# Specification Quality Checklist: Hub Interop Protocol And Federated Capability Exchange (Superseded)
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning  
 **Created**: 2026-04-23  
@@ -31,5 +31,6 @@
 
 ## Notes
 
-- This spec hardens Mobile Claw's cross-app protocol in the direction of an explicit hub-grade interop family before any dedicated validation app is introduced.
-- Generic share ingress remains a compatibility path, but it is no longer treated as sufficient for the long-term externally callable and federated-capability model.
+- This checklist now remains only as a record for the superseded exploratory `022` draft.
+- The agreed protocol docs baseline is organized under [Hub Interop Docs Index v1](/Users/youxuezhe/StudioProjects/mobile_claw/docs/hub-interop-docs-index-v1.md).
+- Implementation work now starts from `024-shared-interop-contract`, `025-mobileclaw-interop-host`, and `026-interop-probe-app`.

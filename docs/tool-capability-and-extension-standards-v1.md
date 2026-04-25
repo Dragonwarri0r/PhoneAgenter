@@ -51,14 +51,15 @@ Android 侧能力暴露与调用采用：
 
 其他 app 与 Mobile Claw 的互操作优先采用：
 
-- `ACTION_SEND` / `ACTION_SEND_MULTIPLE`
-- `content://` URI grants
+- `AppFunctions` 作为显式 callable capability 的首选 Android-native adapter
+- 自定义 `HubInteropProvider` + `content://` URI grants 作为 discovery / auth / task / resource 的基线 transport
+- `ACTION_SEND` / `ACTION_SEND_MULTIPLE` 作为 compatibility ingress
 - `ACTION_OPEN_DOCUMENT`
 - Photo Picker 返回的受控媒体访问句柄
 
-当平台与生态条件成熟时，再逐步补上：
+更完整的 Android IPC 分层与边界，以上游文档 [Hub Interop Android IPC Design v1](./hub-interop-android-ipc-v1.md) 为准。
 
-- `App Functions` 对外暴露的 callable surface
+对外 contract 的模块边界与分发方式，以上游文档 [Hub Interop Module Packaging v1](./hub-interop-module-packaging-v1.md) 为准。
 
 ### 2.4 扩展注册
 
@@ -100,6 +101,13 @@ Android 侧能力暴露与调用采用：
 - preview capability
 - scope requirement
 - audit event
+
+显式 `read` tool 也需要自己的合同，但它的要求不同：
+
+- 必须有 bounded query scope
+- 必须能返回 `matched / no_results / unavailable`
+- 可以自动执行，但前提是它是低风险读取且 selection confidence 足够高
+- 不能伪装成被动上下文附着
 
 ### 3.3 多模态入口必须受模型能力 gating
 
@@ -235,6 +243,7 @@ data class RuntimeExtensionRegistration(
 | Capability Family | Primary Binding | Recommended Fallback | Notes |
 |---|---|---|---|
 | `calendar.read` | `Calendar Provider` | none in first cut | Requires scoped queries and `READ_CALENDAR` when used directly |
+| `contacts.read` | `Contacts Provider` | unavailable until a local read provider is wired | Reuses the same explicit read-provider registration surface |
 | `calendar.write` | structured tool + provider/app binding | `Intent.ACTION_INSERT` to calendar app | Default to preview/confirm before commit |
 | `alarm.set` | structured tool + Android alarm binding | `AlarmClock.ACTION_SET_ALARM` | Keep user-visible and auditable |
 | `alarm.dismiss` | structured tool + Android alarm binding | `AlarmClock.ACTION_DISMISS_ALARM` | Only when device/app surface supports it |
@@ -250,8 +259,10 @@ data class RuntimeExtensionRegistration(
 说明：
 
 - `calendar.read` 和 `calendar.write` 不应混成一个 tool
+- 显式 `read tool` 与被动 `context source` 不应混成同一条执行路径
 - `alarm.*` 需要独立 family，而不是挤进 `calendar.write`
 - `share.outbound` 与 `ingress.share_*` 是两个方向，不应混淆
+- workspace freeform inference 可以自动选择低风险 `read`，但不应静默自动执行 `write / dispatch`
 
 ## 7. 多模态支持规范
 

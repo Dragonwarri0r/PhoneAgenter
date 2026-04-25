@@ -408,6 +408,10 @@ fun AgentWorkspaceScreen(
                             showRuntimeControlCenter = false
                             showGovernanceCenter = true
                         }
+                        "interop_host" -> {
+                            showRuntimeControlCenter = false
+                            showGovernanceCenter = true
+                        }
                         "approval" -> showRuntimeControlCenter = false
                         "system_permissions" -> {
                             showRuntimeControlCenter = false

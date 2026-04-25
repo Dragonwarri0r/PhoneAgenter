@@ -953,4 +953,24 @@
     <string name="runtime_contribution_scope_mutation_capabilities">写入能力：%1$s</string>
     <string name="runtime_contribution_read_provider_note">通过共享 capability surface 提供受治理、有边界的读取访问。</string>
     <string name="runtime_contribution_mutation_provider_note">通过共享 capability surface 提供受治理、可审计的设备写入访问。</string>
+    <string name="runtime_control_artifact_interop_host">Interop Host</string>
+    <string name="runtime_control_interop_idle">当前还没有跨 App host 互通运行记录。</string>
+    <string name="runtime_control_interop_task_count">最近有 %1$d 条 interop host 运行记录</string>
+    <string name="interop_task_status_pending">待处理</string>
+    <string name="interop_task_status_running">进行中</string>
+    <string name="interop_task_status_input_required">等待输入</string>
+    <string name="interop_task_status_completed">已完成</string>
+    <string name="interop_task_status_failed">失败</string>
+    <string name="interop_task_status_cancelled">已取消</string>
+    <string name="hub_interop_surface_display_name">Mobile Claw Hub</string>
+    <string name="hub_interop_surface_summary">用于跨 App 能力发现与调用的 Mobile Claw 受治理运行时 surface。</string>
+    <string name="hub_interop_task_queued">%1$s 请求已进入执行队列。</string>
+    <string name="hub_interop_authorization_required_message">该能力暂时还不能在没有授权流程的情况下供外部调用方直接使用。</string>
+    <string name="hub_interop_authorization_not_implemented">该 host surface 的授权管理流程暂未实现。</string>
+    <string name="hub_interop_authorization_requested">已为 %1$s 发起授权请求。</string>
+    <string name="hub_interop_authorization_required">调用此能力前，请打开 Mobile Claw 的治理中心并为 %2$s 批准 %1$s。</string>
+    <string name="hub_interop_authorization_pending">%2$s 的 %1$s 授权正在 Mobile Claw 的治理中心中等待处理。</string>
+    <string name="hub_interop_authorization_granted">%1$s 的授权已生效。</string>
+    <string name="hub_interop_authorization_denied">%1$s 的授权已被拒绝。</string>
+    <string name="hub_interop_authorization_revoked">%1$s 的授权已被撤销。</string>
 </resources>

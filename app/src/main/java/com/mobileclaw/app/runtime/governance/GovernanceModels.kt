@@ -39,6 +39,7 @@ data class GovernanceDecisionSnapshot(
 )
 
 fun governanceEditableScopes(): List<ActionScope> = listOf(
+    ActionScope.REPLY_GENERATE,
     ActionScope.MESSAGE_SEND,
     ActionScope.CALENDAR_WRITE,
     ActionScope.EXTERNAL_SHARE,

@@ -3,6 +3,7 @@ package com.mobileclaw.app.ui.agentworkspace
 import com.mobileclaw.app.runtime.localchat.LocalModelProfile
 import com.mobileclaw.app.runtime.localchat.ModelAvailabilityStatus
 import com.mobileclaw.app.runtime.systemsource.SystemSourceDescriptor
+import com.mobileclaw.interop.contract.InteropTaskDescriptor
 import com.mobileclaw.app.ui.agentworkspace.model.ApprovalUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.AutomationAreaUiModel
 import com.mobileclaw.app.ui.agentworkspace.model.AttachmentUiModel
@@ -49,6 +50,7 @@ data class AgentWorkspaceUiState(
     val governanceCenter: GovernanceCenterUiModel = GovernanceCenterUiModel(),
     val pendingApproval: ApprovalUiModel? = null,
     val recentAudit: List<AuditUiModel> = emptyList(),
+    val interopTasks: List<InteropTaskDescriptor> = emptyList(),
     val systemSourceDescriptors: List<SystemSourceDescriptor> = emptyList(),
     val contributionOutcomes: List<RuntimeContributionUiModel> = emptyList(),
     val composerDraft: String = "",

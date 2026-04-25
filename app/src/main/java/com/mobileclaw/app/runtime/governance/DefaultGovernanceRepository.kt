@@ -17,6 +17,17 @@ class DefaultGovernanceRepository @Inject constructor(
     private val appStrings: AppStrings,
 ) : GovernanceRepository {
 
+    override suspend fun getCallerRecord(callerId: String): CallerGovernanceRecord? {
+        return governanceDao.getCaller(callerId)
+    }
+
+    override suspend fun getScopeGrant(
+        callerId: String,
+        scopeId: String,
+    ): ScopeGrantRecord? {
+        return governanceDao.getScopeGrant(callerId, scopeId)
+    }
+
     override fun observeGovernanceCenter(limit: Int): Flow<GovernanceCenterSnapshot> {
         return combine(
             governanceDao.observeRecentCallers(limit),

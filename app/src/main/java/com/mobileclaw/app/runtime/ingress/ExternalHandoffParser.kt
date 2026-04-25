@@ -7,6 +7,7 @@ import com.mobileclaw.app.R
 import com.mobileclaw.app.runtime.multimodal.AttachmentStore
 import com.mobileclaw.app.runtime.multimodal.RuntimeAttachmentKind
 import com.mobileclaw.app.runtime.strings.AppStrings
+import com.mobileclaw.interop.contract.InteropIds
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -82,7 +83,7 @@ class ExternalHandoffParser @Inject constructor(
         val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)?.trim().takeUnless { it.isNullOrBlank() }
         val handoffId = "handoff-${System.currentTimeMillis()}"
         val callerIdentity = CallerContractIdentity(
-            originApp = packageName ?: "external.share",
+            originApp = packageName ?: InteropIds.Origin.EXTERNAL_SHARE,
             packageName = packageName,
             sourceLabel = sourceLabel,
             trustState = ExternalTrustState.UNVERIFIED,
